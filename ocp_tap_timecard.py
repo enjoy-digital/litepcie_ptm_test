@@ -107,7 +107,9 @@ class BaseSoC(SoCCore):
         if with_pcie:
             self.pcie_phy = S7PCIEPHY(platform, platform.request("pcie_x1"),
                 data_width = 64,
-                bar0_size  = 0x20000)
+                bar0_size  = 0x20000,
+                msi_type   = "msi-x"
+            )
             self.add_pcie(phy=self.pcie_phy, ndmas=1, address_width=64, msi_type="msi-x")
             # FIXME: Apply it to all targets (integrate it in LitePCIe?).
             platform.add_period_constraint(self.crg.cd_sys.clk, 1e9/sys_clk_freq)

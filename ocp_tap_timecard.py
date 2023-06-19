@@ -108,7 +108,7 @@ class BaseSoC(SoCCore):
             self.pcie_phy = S7PCIEPHY(platform, platform.request("pcie_x1"),
                 data_width = 64,
                 bar0_size  = 0x20000)
-            self.add_pcie(phy=self.pcie_phy, ndmas=1, address_width=64)
+            self.add_pcie(phy=self.pcie_phy, ndmas=1, address_width=64, msi_type="msi-x")
             # FIXME: Apply it to all targets (integrate it in LitePCIe?).
             platform.add_period_constraint(self.crg.cd_sys.clk, 1e9/sys_clk_freq)
             platform.toolchain.pre_placement_commands.append("reset_property LOC [get_cells -hierarchical -filter {{NAME=~*gtp_channel.gtpe2_channel_i}}]")

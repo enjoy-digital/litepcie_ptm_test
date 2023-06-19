@@ -8,7 +8,7 @@
 
 # Build/Use ----------------------------------------------------------------------------------------
 # Build/Load bitstream:
-# ./ocp_tap_timecard.py --uart-name=crossover --with-pcie --with-smas --build --driver --load (or --flash)
+# ./ocp_tap_timecard.py --with-pcie --csr-csv=csr.csv --build --load
 #
 #.Build the kernel and load it:
 # cd build/<platform>/driver/kernel
@@ -22,6 +22,11 @@
 # ./litepcie_util scratch_test
 # ./litepcie_util dma_test
 # ./litepcie_util uart_test
+#
+# Debug over JTAGBone:
+# litex_server --jtag --jtag-config=openocd_xc7_ft232.cfg
+# litex_cli --regs
+# litescope_cli
 
 import os
 
@@ -74,11 +79,17 @@ class CRG(LiteXModule):
 
 # BaseSoC -----------------------------------------------------------------------------------------
 
-class BaseSoC(SoCCore):
+class BaseSoC(SoCMini):
+    SoCMini.csr_map = {
+        "pcie_msi":       3, # Requires fixed mapping for MSI-X.
+        "pcie_msi_table": 4, # Requires fixed mapping for MSI-X.
+    }
     def __init__(self, sys_clk_freq=100e6,
+        with_jtag_bone  = True,
         with_led_chaser = True,
         with_pcie       = False,
         with_smas       = False,
+        with_analyzer   = True,
         **kwargs):
         platform = ocp_tap_timecard.Platform()
 
@@ -86,8 +97,13 @@ class BaseSoC(SoCCore):
         self.crg = CRG(platform, sys_clk_freq)
 
         # SoCCore ----------------------------------------------------------------------------------
-        kwargs["uart_name"] = "crossover"
-        SoCCore.__init__(self, platform, sys_clk_freq, ident="LiteX SoC on OCP-TAP TimeCard", **kwargs)
+        SoCMini.__init__(self, platform, sys_clk_freq,
+            ident         = "LiteX SoC on OCP-TAP TimeCard",
+            ident_version = True
+        )
+
+        # JTAGBone ---------------------------------------------------------------------------------
+        self.add_jtagbone()
 
         # XADC -------------------------------------------------------------------------------------
         self.xadc = XADC()
@@ -107,7 +123,7 @@ class BaseSoC(SoCCore):
         if with_pcie:
             self.pcie_phy = S7PCIEPHY(platform, platform.request("pcie_x1"),
                 data_width = 64,
-                bar0_size  = 0x20000,
+                bar0_size  = 0x10_0000, # 1MB.
                 msi_type   = "msi-x"
             )
             self.add_pcie(phy=self.pcie_phy, ndmas=1, address_width=64, msi_type="msi-x")
@@ -127,6 +143,31 @@ class BaseSoC(SoCCore):
             from litex.soc.cores.spi_flash import S7SPIFlash
             self.flash_cs_n = GPIOOut(platform.request("flash_cs_n"))
             self.flash      = S7SPIFlash(platform.request("flash"), sys_clk_freq, 25e6)
+
+        # Analyzer ---------------------------------------------------------------------------------
+
+        if with_pcie and with_analyzer:
+            from litescope import LiteScopeAnalyzer
+            analyzer_signals = self.pcie_msi.debug
+            # With self.msi.debug:
+            #self.debug = [
+            #    self.irqs,
+            #    self.enable.storage,
+            #    self.pba.status,
+            #    msix_valid,
+            #    msix_ready,
+            #    msix_num,
+            #    fsm,
+            #    port.source,
+            #]
+
+            self.adc_analyzer = LiteScopeAnalyzer(analyzer_signals,
+                depth        = 512,
+                register     = True,
+                clock_domain = "sys",
+                csr_csv      = "analyzer.csv"
+            )
+
 
         # SMAs -------------------------------------------------------------------------------------
         if with_smas:

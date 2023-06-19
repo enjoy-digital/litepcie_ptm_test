@@ -1051,7 +1051,7 @@ static int litepcie_pci_probe(struct pci_dev *dev, const struct pci_device_id *i
 		goto fail1;
 	};
 
-	irqs = pci_alloc_irq_vectors(dev, 1, 32, PCI_IRQ_MSI);
+	irqs = pci_alloc_irq_vectors(dev, 1, 32, PCI_IRQ_MSIX);
 	if (irqs < 0) {
 		dev_err(&dev->dev, "Failed to enable MSI\n");
 		ret = irqs;

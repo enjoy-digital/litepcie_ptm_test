@@ -317,7 +317,7 @@ static irqreturn_t litepcie_interrupt(int irq, void *data)
 #ifdef CSR_PCIE_MSI_CLEAR_ADDR
 	irq_vector = litepcie_readl(s, CSR_PCIE_MSI_VECTOR_ADDR);
 	irq_enable = litepcie_readl(s, CSR_PCIE_MSI_ENABLE_ADDR);
-/* Multi-Vector MSI */
+/* MSI MultiVextor / MSI-X */
 #else
 	irq_vector = 0;
 	for (i = 0; i < s->irqs; i++) {
@@ -1051,7 +1051,13 @@ static int litepcie_pci_probe(struct pci_dev *dev, const struct pci_device_id *i
 		goto fail1;
 	};
 
+/* Single MSI */
+#ifdef CSR_PCIE_MSI_CLEAR_ADDR
+	irqs = pci_alloc_irq_vectors(dev, 1, 32, PCI_IRQ_MSI);
+/* MSI MultiVextor / MSI-X */
+#else
 	irqs = pci_alloc_irq_vectors(dev, 1, 32, PCI_IRQ_MSIX);
+#endif
 	if (irqs < 0) {
 		dev_err(&dev->dev, "Failed to enable MSI\n");
 		ret = irqs;

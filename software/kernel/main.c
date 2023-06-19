@@ -41,7 +41,7 @@
 #include "soc.h"
 
 //#define DEBUG_CSR
-//#define DEBUG_MSI
+#define DEBUG_MSI
 //#define DEBUG_POLL
 //#define DEBUG_READ
 //#define DEBUG_WRITE
@@ -198,14 +198,14 @@ static void litepcie_dma_writer_start(struct litepcie_device *s, int chan_num)
 	litepcie_writel(s, dmachan->base + PCIE_DMA_WRITER_TABLE_LOOP_PROG_N_OFFSET, 0);
 	for (i = 0; i < DMA_BUFFER_COUNT; i++) {
 		/* Fill buffer size + parameters. */
-		litepcie_writel(s, dmachan->base + PCIE_DMA_WRITER_TABLE_VALUE_OFFSET,
+		litepcie_writel(s, dmachan->base + PCIE_DMA_WRITER_TABLE_VALUE_OFFSET + 4,
 #ifndef DMA_BUFFER_ALIGNED
 			DMA_LAST_DISABLE |
 #endif
 			(!(i%DMA_BUFFER_PER_IRQ == 0)) * DMA_IRQ_DISABLE | /* generate an msi */
 			DMA_BUFFER_SIZE);                                  /* every n buffers */
 		/* Fill 32-bit Address LSB. */
-		litepcie_writel(s, dmachan->base + PCIE_DMA_WRITER_TABLE_VALUE_OFFSET + 4, (dmachan->writer_handle[i] >>  0) & 0xffffffff);
+		litepcie_writel(s, dmachan->base + PCIE_DMA_WRITER_TABLE_VALUE_OFFSET, (dmachan->writer_handle[i] >>  0) & 0xffffffff);
 		/* Write descriptor (and fill 32-bit Address MSB for 64-bit mode). */
 		litepcie_writel(s, dmachan->base + PCIE_DMA_WRITER_TABLE_WE_OFFSET,        (dmachan->writer_handle[i] >> 32) & 0xffffffff);
 	}
@@ -252,14 +252,14 @@ static void litepcie_dma_reader_start(struct litepcie_device *s, int chan_num)
 	litepcie_writel(s, dmachan->base + PCIE_DMA_READER_TABLE_LOOP_PROG_N_OFFSET, 0);
 	for (i = 0; i < DMA_BUFFER_COUNT; i++) {
 		/* Fill buffer size + parameters. */
-		litepcie_writel(s, dmachan->base + PCIE_DMA_READER_TABLE_VALUE_OFFSET,
+		litepcie_writel(s, dmachan->base + PCIE_DMA_READER_TABLE_VALUE_OFFSET + 4,
 #ifndef DMA_BUFFER_ALIGNED
 			DMA_LAST_DISABLE |
 #endif
 			(!(i%DMA_BUFFER_PER_IRQ == 0)) * DMA_IRQ_DISABLE | /* generate an msi */
 			DMA_BUFFER_SIZE);                                  /* every n buffers */
 		/* Fill 32-bit Address LSB. */
-		litepcie_writel(s, dmachan->base + PCIE_DMA_READER_TABLE_VALUE_OFFSET + 4, (dmachan->reader_handle[i] >>  0) & 0xffffffff);
+		litepcie_writel(s, dmachan->base + PCIE_DMA_READER_TABLE_VALUE_OFFSET, (dmachan->reader_handle[i] >>  0) & 0xffffffff);
 		/* Write descriptor (and fill 32-bit Address MSB for 64-bit mode). */
 		litepcie_writel(s, dmachan->base + PCIE_DMA_READER_TABLE_WE_OFFSET, (dmachan->reader_handle[i] >> 32) & 0xffffffff);
 	}
@@ -1030,10 +1030,10 @@ static int litepcie_pci_probe(struct pci_dev *dev, const struct pci_device_id *i
 	}
 
 	/* Reset LitePCIe core */
-#ifdef CSR_CTRL_RESET_ADDR
-	litepcie_writel(litepcie_dev, CSR_CTRL_RESET_ADDR, 1);
-	msleep(10);
-#endif
+//#ifdef CSR_CTRL_RESET_ADDR
+//	litepcie_writel(litepcie_dev, CSR_CTRL_RESET_ADDR, 1);
+//	msleep(10);
+//#endif
 
 	/* Show identifier */
 	for (i = 0; i < 256; i++)
@@ -1063,7 +1063,7 @@ static int litepcie_pci_probe(struct pci_dev *dev, const struct pci_device_id *i
 	for (i = 0; i < irqs; i++) {
 		int irq = pci_irq_vector(dev, i);
 
-		ret = request_irq(irq, litepcie_interrupt, IRQF_SHARED, LITEPCIE_NAME, litepcie_dev);
+		ret = request_irq(irq, litepcie_interrupt, 0, LITEPCIE_NAME, litepcie_dev);
 		if (ret < 0) {
 			dev_err(&dev->dev, " Failed to allocate IRQ %d\n", dev->irq);
 			while (--i >= 0) {

@@ -99,7 +99,8 @@ class BaseSoC(SoCMini):
         # SoCCore ----------------------------------------------------------------------------------
         SoCMini.__init__(self, platform, sys_clk_freq,
             ident         = "LiteX SoC on OCP-TAP TimeCard",
-            ident_version = True
+            ident_version = True,
+            csr_ordering  = "little",
         )
 
         # JTAGBone ---------------------------------------------------------------------------------
@@ -126,7 +127,7 @@ class BaseSoC(SoCMini):
                 bar0_size  = 0x10_0000, # 1MB.
                 msi_type   = "msi-x"
             )
-            self.add_pcie(phy=self.pcie_phy, ndmas=1, address_width=64, msi_type="msi-x")
+            self.add_pcie(phy=self.pcie_phy, ndmas=1, address_width=32, msi_type="msi-x")
             # FIXME: Apply it to all targets (integrate it in LitePCIe?).
             platform.add_period_constraint(self.crg.cd_sys.clk, 1e9/sys_clk_freq)
             platform.toolchain.pre_placement_commands.append("reset_property LOC [get_cells -hierarchical -filter {{NAME=~*gtp_channel.gtpe2_channel_i}}]")
@@ -159,9 +160,9 @@ class BaseSoC(SoCMini):
             #    msix_num,
             #    fsm,
             #    port.source,
-            #]
+            #
 
-            self.adc_analyzer = LiteScopeAnalyzer(analyzer_signals,
+            self.analyzer = LiteScopeAnalyzer(analyzer_signals,
                 depth        = 512,
                 register     = True,
                 clock_domain = "sys",

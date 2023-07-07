@@ -89,7 +89,7 @@ class BaseSoC(SoCMini):
         with_led_chaser = True,
         with_pcie       = False,
         with_smas       = False,
-        with_analyzer   = False,
+        with_analyzer   = True,
         **kwargs):
         platform = ocp_tap_timecard.Platform()
 
@@ -137,19 +137,11 @@ class BaseSoC(SoCMini):
 
         if with_pcie and with_analyzer:
             from litescope import LiteScopeAnalyzer
-            analyzer_signals = self.pcie_msi.debug
-            # With self.msi.debug:
-            #self.debug = [
-            #    self.irqs,
-            #    self.enable.storage,
-            #    self.pba.status,
-            #    msix_valid,
-            #    msix_ready,
-            #    msix_num,
-            #    fsm,
-            #    port.source,
-            #
-
+            analyzer_signals = [
+                self.pcie_msi.irqs,
+                self.pcie_phy.sink,
+                self.pcie_phy.source,
+            ]
             self.analyzer = LiteScopeAnalyzer(analyzer_signals,
                 depth        = 512,
                 register     = True,

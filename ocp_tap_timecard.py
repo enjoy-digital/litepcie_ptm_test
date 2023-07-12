@@ -9,6 +9,7 @@
 # Build/Use ----------------------------------------------------------------------------------------
 # Build/Load bitstream:
 # ./ocp_tap_timecard.py --with-pcie --csr-csv=csr.csv --build --load
+# ./ocp_tap_timecard.py --with-pcie --csr-csv=csr.csv --build --no-compile --driver
 #
 #.Build the kernel and load it:
 # cd build/<platform>/driver/kernel
@@ -100,7 +101,6 @@ class BaseSoC(SoCMini):
         SoCMini.__init__(self, platform, sys_clk_freq,
             ident         = "LiteX SoC on OCP-TAP TimeCard",
             ident_version = True,
-            csr_ordering  = "little",
         )
 
         # JTAGBone ---------------------------------------------------------------------------------
@@ -139,8 +139,10 @@ class BaseSoC(SoCMini):
             from litescope import LiteScopeAnalyzer
             analyzer_signals = [
                 self.pcie_msi.irqs,
+                self.pcie_msi.port.source.valid,
+                self.pcie_msi.table_port.adr,
+                self.pcie_msi.table_port.dat_r,
                 self.pcie_phy.sink,
-                self.pcie_phy.source,
             ]
             self.analyzer = LiteScopeAnalyzer(analyzer_signals,
                 depth        = 512,

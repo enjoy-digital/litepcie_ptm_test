@@ -198,14 +198,14 @@ static void litepcie_dma_writer_start(struct litepcie_device *s, int chan_num)
 	litepcie_writel(s, dmachan->base + PCIE_DMA_WRITER_TABLE_LOOP_PROG_N_OFFSET, 0);
 	for (i = 0; i < DMA_BUFFER_COUNT; i++) {
 		/* Fill buffer size + parameters. */
-		litepcie_writel(s, dmachan->base + PCIE_DMA_WRITER_TABLE_VALUE_OFFSET + 4,
+		litepcie_writel(s, dmachan->base + PCIE_DMA_WRITER_TABLE_VALUE_OFFSET,
 #ifndef DMA_BUFFER_ALIGNED
 			DMA_LAST_DISABLE |
 #endif
 			(!(i%DMA_BUFFER_PER_IRQ == 0)) * DMA_IRQ_DISABLE | /* generate an msi */
 			DMA_BUFFER_SIZE);                                  /* every n buffers */
 		/* Fill 32-bit Address LSB. */
-		litepcie_writel(s, dmachan->base + PCIE_DMA_WRITER_TABLE_VALUE_OFFSET, (dmachan->writer_handle[i] >>  0) & 0xffffffff);
+		litepcie_writel(s, dmachan->base + PCIE_DMA_WRITER_TABLE_VALUE_OFFSET + 4, (dmachan->writer_handle[i] >>  0) & 0xffffffff);
 		/* Write descriptor (and fill 32-bit Address MSB for 64-bit mode). */
 		litepcie_writel(s, dmachan->base + PCIE_DMA_WRITER_TABLE_WE_OFFSET,        (dmachan->writer_handle[i] >> 32) & 0xffffffff);
 	}
@@ -252,14 +252,14 @@ static void litepcie_dma_reader_start(struct litepcie_device *s, int chan_num)
 	litepcie_writel(s, dmachan->base + PCIE_DMA_READER_TABLE_LOOP_PROG_N_OFFSET, 0);
 	for (i = 0; i < DMA_BUFFER_COUNT; i++) {
 		/* Fill buffer size + parameters. */
-		litepcie_writel(s, dmachan->base + PCIE_DMA_READER_TABLE_VALUE_OFFSET + 4,
+		litepcie_writel(s, dmachan->base + PCIE_DMA_READER_TABLE_VALUE_OFFSET,
 #ifndef DMA_BUFFER_ALIGNED
 			DMA_LAST_DISABLE |
 #endif
 			(!(i%DMA_BUFFER_PER_IRQ == 0)) * DMA_IRQ_DISABLE | /* generate an msi */
 			DMA_BUFFER_SIZE);                                  /* every n buffers */
 		/* Fill 32-bit Address LSB. */
-		litepcie_writel(s, dmachan->base + PCIE_DMA_READER_TABLE_VALUE_OFFSET, (dmachan->reader_handle[i] >>  0) & 0xffffffff);
+		litepcie_writel(s, dmachan->base + PCIE_DMA_READER_TABLE_VALUE_OFFSET + 4, (dmachan->reader_handle[i] >>  0) & 0xffffffff);
 		/* Write descriptor (and fill 32-bit Address MSB for 64-bit mode). */
 		litepcie_writel(s, dmachan->base + PCIE_DMA_READER_TABLE_WE_OFFSET, (dmachan->reader_handle[i] >> 32) & 0xffffffff);
 	}
@@ -1063,7 +1063,13 @@ static int litepcie_pci_probe(struct pci_dev *dev, const struct pci_device_id *i
 		ret = irqs;
 		goto fail1;
 	}
+/* Single MSI */
+#ifdef CSR_PCIE_MSI_CLEAR_ADDR
 	dev_info(&dev->dev, "%d MSI IRQs allocated.\n", irqs);
+/* MSI MultiVextor / MSI-X */
+#else
+	dev_info(&dev->dev, "%d MSI-X IRQs allocated.\n", irqs);
+#endif
 
 	litepcie_dev->irqs = 0;
 	for (i = 0; i < irqs; i++) {
@@ -1080,6 +1086,11 @@ static int litepcie_pci_probe(struct pci_dev *dev, const struct pci_device_id *i
 		}
 		litepcie_dev->irqs += 1;
 	}
+
+//	printk("Scratch %08x\n", litepcie_readl(litepcie_dev, CSR_CTRL_SCRATCH_ADDR));
+//	for (i=0; i<32; i++) {
+//		printk("0x%04x : 0x%08x", 0x2000 + 4*i, litepcie_readl(litepcie_dev, CSR_PCIE_MSI_TABLE_BASE + 4*i));
+//	}
 
 	litepcie_dev->channels = DMA_CHANNELS;
 

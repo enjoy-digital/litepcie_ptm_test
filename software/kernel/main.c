@@ -41,7 +41,7 @@
 #include "soc.h"
 
 //#define DEBUG_CSR
-#define DEBUG_MSI
+//#define DEBUG_MSI
 //#define DEBUG_POLL
 //#define DEBUG_READ
 //#define DEBUG_WRITE
@@ -317,7 +317,7 @@ static irqreturn_t litepcie_interrupt(int irq, void *data)
 #ifdef CSR_PCIE_MSI_CLEAR_ADDR
 	irq_vector = litepcie_readl(s, CSR_PCIE_MSI_VECTOR_ADDR);
 	irq_enable = litepcie_readl(s, CSR_PCIE_MSI_ENABLE_ADDR);
-/* MSI MultiVextor / MSI-X */
+/* MSI MultiVector / MSI-X */
 #else
 	irq_vector = 0;
 	for (i = 0; i < s->irqs; i++) {
@@ -1051,24 +1051,25 @@ static int litepcie_pci_probe(struct pci_dev *dev, const struct pci_device_id *i
 		goto fail1;
 	};
 
-/* Single MSI */
-#ifdef CSR_PCIE_MSI_CLEAR_ADDR
-	irqs = pci_alloc_irq_vectors(dev, 1, 32, PCI_IRQ_MSI);
-/* MSI MultiVextor / MSI-X */
-#else
+
+/* MSI-X */
+#ifdef CSR_PCIE_MSI_PBA_ADDR
 	irqs = pci_alloc_irq_vectors(dev, 1, 32, PCI_IRQ_MSIX);
+/* MSI Single / MultiVector */
+#else
+	irqs = pci_alloc_irq_vectors(dev, 1, 32, PCI_IRQ_MSI);
 #endif
 	if (irqs < 0) {
 		dev_err(&dev->dev, "Failed to enable MSI\n");
 		ret = irqs;
 		goto fail1;
 	}
-/* Single MSI */
-#ifdef CSR_PCIE_MSI_CLEAR_ADDR
-	dev_info(&dev->dev, "%d MSI IRQs allocated.\n", irqs);
-/* MSI MultiVextor / MSI-X */
-#else
+/* MSI-X */
+#ifdef CSR_PCIE_MSI_PBA_ADDR
 	dev_info(&dev->dev, "%d MSI-X IRQs allocated.\n", irqs);
+/* MSI Single / MultiVector */
+#else
+	dev_info(&dev->dev, "%d MSI IRQs allocated.\n", irqs);
 #endif
 
 	litepcie_dev->irqs = 0;
@@ -1086,11 +1087,6 @@ static int litepcie_pci_probe(struct pci_dev *dev, const struct pci_device_id *i
 		}
 		litepcie_dev->irqs += 1;
 	}
-
-//	printk("Scratch %08x\n", litepcie_readl(litepcie_dev, CSR_CTRL_SCRATCH_ADDR));
-//	for (i=0; i<32; i++) {
-//		printk("0x%04x : 0x%08x", 0x2000 + 4*i, litepcie_readl(litepcie_dev, CSR_PCIE_MSI_TABLE_BASE + 4*i));
-//	}
 
 	litepcie_dev->channels = DMA_CHANNELS;
 

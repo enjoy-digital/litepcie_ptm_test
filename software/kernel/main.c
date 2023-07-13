@@ -1030,10 +1030,10 @@ static int litepcie_pci_probe(struct pci_dev *dev, const struct pci_device_id *i
 	}
 
 	/* Reset LitePCIe core */
-//#ifdef CSR_CTRL_RESET_ADDR
-//	litepcie_writel(litepcie_dev, CSR_CTRL_RESET_ADDR, 1);
-//	msleep(10);
-//#endif
+#ifdef CSR_CTRL_RESET_ADDR
+	litepcie_writel(litepcie_dev, CSR_CTRL_RESET_ADDR, 1);
+	msleep(10);
+#endif
 
 	/* Show identifier */
 	for (i = 0; i < 256; i++)

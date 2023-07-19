@@ -59,9 +59,6 @@ class CRG(LiteXModule):
     def __init__(self, platform, sys_clk_freq):
         self.rst          = Signal()
         self.cd_sys       = ClockDomain()
-        self.cd_sys4x     = ClockDomain()
-        self.cd_sys4x_dqs = ClockDomain()
-        self.cd_idelay    = ClockDomain()
 
         # Clk/Rst
         clk200 = platform.request("clk200")
@@ -70,13 +67,8 @@ class CRG(LiteXModule):
         self.pll = pll = S7PLL()
         self.comb += pll.reset.eq(self.rst)
         pll.register_clkin(clk200, 200e6)
-        pll.create_clkout(self.cd_sys,       sys_clk_freq)
-        pll.create_clkout(self.cd_sys4x,     4*sys_clk_freq)
-        pll.create_clkout(self.cd_sys4x_dqs, 4*sys_clk_freq, phase=90)
-        pll.create_clkout(self.cd_idelay,    200e6)
+        pll.create_clkout(self.cd_sys, sys_clk_freq)
         platform.add_false_path_constraints(self.cd_sys.clk, pll.clkin) # Ignore sys_clk to pll.clkin path created by SoC's rst.
-
-        self.idelayctrl = S7IDELAYCTRL(self.cd_idelay)
 
 # BaseSoC -----------------------------------------------------------------------------------------
 
@@ -86,11 +78,11 @@ class BaseSoC(SoCMini):
         "pcie_msi_table": 4, # Requires fixed mapping for MSI-X.
     }
     def __init__(self, sys_clk_freq=100e6, pcie_address_width=32, pcie_msi_type="msi-x",
-        with_jtag_bone  = True,
+        with_jtagbone   = True,
         with_led_chaser = True,
         with_pcie       = False,
         with_smas       = False,
-        with_analyzer   = True,
+        with_analyzer   = False,
         **kwargs):
         platform = ocp_tap_timecard.Platform()
 
@@ -104,7 +96,10 @@ class BaseSoC(SoCMini):
         )
 
         # JTAGBone ---------------------------------------------------------------------------------
-        self.add_jtagbone()
+        if with_jtagbone:
+            self.add_jtagbone()
+            platform.add_period_constraint(self.jtagbone_phy.cd_jtag.clk, 1e9/20e6)
+            platform.add_false_path_constraints(self.jtagbone_phy.cd_jtag.clk, self.crg.cd_sys.clk)
 
         # XADC -------------------------------------------------------------------------------------
         self.xadc = XADC()
@@ -132,6 +127,25 @@ class BaseSoC(SoCMini):
             platform.add_period_constraint(self.crg.cd_sys.clk, 1e9/sys_clk_freq)
             platform.toolchain.pre_placement_commands.append("reset_property LOC [get_cells -hierarchical -filter {{NAME=~*gtp_channel.gtpe2_channel_i}}]")
             platform.toolchain.pre_placement_commands.append("set_property LOC GTPE2_CHANNEL_X0Y5 [get_cells -hierarchical -filter {{NAME=~*gtp_channel.gtpe2_channel_i}}]")
+
+            #platform.add_false_path_constraints(
+            #    self.crg.cd_sys.clk,
+            #    self.pcie_phy.cd_clk125.clk,
+            #    self.pcie_phy.cd_clk250.clk,
+            #    self.pcie_phy.cd_userclk1.clk,
+            #    self.pcie_phy.cd_userclk2.clk,
+            #)
+
+            # PCIe <-> Sys-Clk false paths.
+            false_paths = [
+                ("s7pciephy_clkout0", "sys_clk"),
+                ("s7pciephy_clkout1", "sys_clk"),
+                ("s7pciephy_clkout3", "sys_clk"),
+            ]
+            for clk0, clk1 in false_paths:
+                platform.toolchain.pre_placement_commands.append(f"set_false_path -from [get_clocks {clk0}] -to [get_clocks {clk1}]")
+                platform.toolchain.pre_placement_commands.append(f"set_false_path -from [get_clocks {clk1}] -to [get_clocks {clk0}]")
+
 
         # Analyzer ---------------------------------------------------------------------------------
 

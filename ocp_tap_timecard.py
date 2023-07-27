@@ -77,7 +77,7 @@ class BaseSoC(SoCMini):
         "pcie_msi":       3, # Requires fixed mapping for MSI-X.
         "pcie_msi_table": 4, # Requires fixed mapping for MSI-X.
     }
-    def __init__(self, sys_clk_freq=100e6, pcie_address_width=32, pcie_msi_type="msi-x",
+    def __init__(self, sys_clk_freq=100e6, pcie_address_width=32, pcie_msi_type="msi-x", with_ptm=True,
         with_jtagbone   = True,
         with_led_chaser = True,
         with_pcie       = False,
@@ -121,20 +121,13 @@ class BaseSoC(SoCMini):
                 data_width = 64,
                 bar0_size  = 0x10_0000, # 1MB.
                 msi_type   = pcie_msi_type,
+                with_ptm   = with_ptm,
             )
             self.add_pcie(phy=self.pcie_phy, ndmas=1, address_width=pcie_address_width, msi_type=pcie_msi_type)
             # FIXME: Apply it to all targets (integrate it in LitePCIe?).
             platform.add_period_constraint(self.crg.cd_sys.clk, 1e9/sys_clk_freq)
             platform.toolchain.pre_placement_commands.append("reset_property LOC [get_cells -hierarchical -filter {{NAME=~*gtp_channel.gtpe2_channel_i}}]")
             platform.toolchain.pre_placement_commands.append("set_property LOC GTPE2_CHANNEL_X0Y5 [get_cells -hierarchical -filter {{NAME=~*gtp_channel.gtpe2_channel_i}}]")
-
-            #platform.add_false_path_constraints(
-            #    self.crg.cd_sys.clk,
-            #    self.pcie_phy.cd_clk125.clk,
-            #    self.pcie_phy.cd_clk250.clk,
-            #    self.pcie_phy.cd_userclk1.clk,
-            #    self.pcie_phy.cd_userclk2.clk,
-            #)
 
             # PCIe <-> Sys-Clk false paths.
             false_paths = [

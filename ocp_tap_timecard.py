@@ -77,7 +77,7 @@ class BaseSoC(SoCMini):
         "pcie_msi":       3, # Requires fixed mapping for MSI-X.
         "pcie_msi_table": 4, # Requires fixed mapping for MSI-X.
     }
-    def __init__(self, sys_clk_freq=100e6, pcie_address_width=32, pcie_msi_type="msi-x", with_ptm=True,
+    def __init__(self, sys_clk_freq=100e6, pcie_address_width=32, pcie_msi_type="msi-x", with_ptm=False,
         with_jtagbone   = True,
         with_led_chaser = True,
         with_pcie       = False,

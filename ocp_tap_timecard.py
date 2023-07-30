@@ -8,8 +8,8 @@
 
 # Build/Use ----------------------------------------------------------------------------------------
 # Build/Load bitstream:
-# ./ocp_tap_timecard.py --with-pcie --csr-csv=csr.csv --build --load
-# ./ocp_tap_timecard.py --with-pcie --csr-csv=csr.csv --build --no-compile --driver
+# ./ocp_tap_timecard.py --csr-csv=csr.csv --build --load
+# ./ocp_tap_timecard.py --csr-csv=csr.csv --build --no-compile --driver
 #
 #.Build the kernel and load it:
 # cd build/<platform>/driver/kernel
@@ -53,6 +53,8 @@ from litedram.phy import s7ddrphy
 from litepcie.phy.s7pciephy import S7PCIEPHY
 from litepcie.software import generate_litepcie_software
 
+from litescope import LiteScopeAnalyzer
+
 # CRG ----------------------------------------------------------------------------------------------
 
 class CRG(LiteXModule):
@@ -78,11 +80,9 @@ class BaseSoC(SoCMini):
         "pcie_msi_table": 4, # Requires fixed mapping for MSI-X.
     }
     def __init__(self, sys_clk_freq=100e6, pcie_address_width=32, pcie_msi_type="msi-x", with_ptm=False,
-        with_jtagbone   = True,
-        with_led_chaser = True,
-        with_pcie       = False,
-        with_smas       = False,
-        with_analyzer   = False,
+        with_jtagbone     = True,
+        with_led_chaser   = True,
+        with_msi_analyzer = False,
         **kwargs):
         platform = ocp_tap_timecard.Platform()
 
@@ -116,34 +116,31 @@ class BaseSoC(SoCMini):
             )
 
         # PCIe -------------------------------------------------------------------------------------
-        if with_pcie:
-            self.pcie_phy = S7PCIEPHY(platform, platform.request("pcie_x1"),
-                data_width = 64,
-                bar0_size  = 0x10_0000, # 1MB.
-                msi_type   = pcie_msi_type,
-                with_ptm   = with_ptm,
-            )
-            self.add_pcie(phy=self.pcie_phy, ndmas=1, address_width=pcie_address_width, msi_type=pcie_msi_type)
-            # FIXME: Apply it to all targets (integrate it in LitePCIe?).
-            platform.add_period_constraint(self.crg.cd_sys.clk, 1e9/sys_clk_freq)
-            platform.toolchain.pre_placement_commands.append("reset_property LOC [get_cells -hierarchical -filter {{NAME=~*gtp_channel.gtpe2_channel_i}}]")
-            platform.toolchain.pre_placement_commands.append("set_property LOC GTPE2_CHANNEL_X0Y5 [get_cells -hierarchical -filter {{NAME=~*gtp_channel.gtpe2_channel_i}}]")
+        self.pcie_phy = S7PCIEPHY(platform, platform.request("pcie_x1"),
+            data_width = 64,
+            bar0_size  = 0x10_0000, # 1MB.
+            msi_type   = pcie_msi_type,
+            with_ptm   = with_ptm,
+        )
+        self.add_pcie(phy=self.pcie_phy, ndmas=1, address_width=pcie_address_width, msi_type=pcie_msi_type)
+        # FIXME: Apply it to all targets (integrate it in LitePCIe?).
+        platform.add_period_constraint(self.crg.cd_sys.clk, 1e9/sys_clk_freq)
+        platform.toolchain.pre_placement_commands.append("reset_property LOC [get_cells -hierarchical -filter {{NAME=~*gtp_channel.gtpe2_channel_i}}]")
+        platform.toolchain.pre_placement_commands.append("set_property LOC GTPE2_CHANNEL_X0Y5 [get_cells -hierarchical -filter {{NAME=~*gtp_channel.gtpe2_channel_i}}]")
 
-            # PCIe <-> Sys-Clk false paths.
-            false_paths = [
-                ("s7pciephy_clkout0", "sys_clk"),
-                ("s7pciephy_clkout1", "sys_clk"),
-                ("s7pciephy_clkout3", "sys_clk"),
-            ]
-            for clk0, clk1 in false_paths:
-                platform.toolchain.pre_placement_commands.append(f"set_false_path -from [get_clocks {clk0}] -to [get_clocks {clk1}]")
-                platform.toolchain.pre_placement_commands.append(f"set_false_path -from [get_clocks {clk1}] -to [get_clocks {clk0}]")
-
+        # PCIe <-> Sys-Clk false paths.
+        false_paths = [
+            ("s7pciephy_clkout0", "sys_clk"),
+            ("s7pciephy_clkout1", "sys_clk"),
+            ("s7pciephy_clkout3", "sys_clk"),
+        ]
+        for clk0, clk1 in false_paths:
+            platform.toolchain.pre_placement_commands.append(f"set_false_path -from [get_clocks {clk0}] -to [get_clocks {clk1}]")
+            platform.toolchain.pre_placement_commands.append(f"set_false_path -from [get_clocks {clk1}] -to [get_clocks {clk0}]")
 
         # Analyzer ---------------------------------------------------------------------------------
 
-        if with_pcie and with_analyzer:
-            from litescope import LiteScopeAnalyzer
+        if with_msi_analyzer:
             analyzer_signals = [
                 self.pcie_msi.irqs,
                 self.pcie_msi.port.source.valid,
@@ -165,13 +162,11 @@ def main():
     parser = LiteXArgumentParser(platform=ocp_tap_timecard.Platform, description="LiteX SoC on OCP-TAP TimeCard.")
     parser.add_target_argument("--flash",        action="store_true",       help="Flash bitstream.")
     parser.add_target_argument("--sys-clk-freq", default=100e6, type=float, help="System clock frequency.")
-    parser.add_target_argument("--with-pcie",    action="store_true", help="Enable PCIe support.")
     parser.add_target_argument("--driver",       action="store_true", help="Generate PCIe driver.")
     args = parser.parse_args()
 
     soc = BaseSoC(
         sys_clk_freq = args.sys_clk_freq,
-        with_pcie    = args.with_pcie,
         **parser.soc_argdict
     )
 

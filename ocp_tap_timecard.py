@@ -79,10 +79,11 @@ class BaseSoC(SoCMini):
         "pcie_msi":       3, # Requires fixed mapping for MSI-X.
         "pcie_msi_table": 4, # Requires fixed mapping for MSI-X.
     }
-    def __init__(self, sys_clk_freq=100e6, pcie_address_width=32, pcie_msi_type="msi-x", with_ptm=False,
+    def __init__(self, sys_clk_freq=100e6, pcie_address_width=32, pcie_msi_type="msi-x", with_ptm=True,
         with_jtagbone     = True,
         with_led_chaser   = True,
         with_msi_analyzer = False,
+        with_ptm_analyzer = True,
         **kwargs):
         platform = ocp_tap_timecard.Platform()
 
@@ -122,7 +123,7 @@ class BaseSoC(SoCMini):
             msi_type   = pcie_msi_type,
             with_ptm   = with_ptm,
         )
-        self.add_pcie(phy=self.pcie_phy, ndmas=1, address_width=pcie_address_width, msi_type=pcie_msi_type)
+        self.add_pcie(phy=self.pcie_phy, ndmas=1, address_width=pcie_address_width, msi_type=pcie_msi_type, with_ptm=with_ptm)
         # FIXME: Apply it to all targets (integrate it in LitePCIe?).
         platform.add_period_constraint(self.crg.cd_sys.clk, 1e9/sys_clk_freq)
         platform.toolchain.pre_placement_commands.append("reset_property LOC [get_cells -hierarchical -filter {{NAME=~*gtp_channel.gtpe2_channel_i}}]")
@@ -138,6 +139,40 @@ class BaseSoC(SoCMini):
             platform.toolchain.pre_placement_commands.append(f"set_false_path -from [get_clocks {clk0}] -to [get_clocks {clk1}]")
             platform.toolchain.pre_placement_commands.append(f"set_false_path -from [get_clocks {clk1}] -to [get_clocks {clk0}]")
 
+        # PTM capabilities -------------------------------------------------------------------------
+
+        comp_port = self.pcie_endpoint.crossbar.get_slave_port(address_decoder=lambda a: 0)
+
+        conf_source = self.pcie_endpoint.depacketizer.conf_source
+
+        self.ptm_fsm = ptm_fsm = FSM(reset_state="IDLE")
+        ptm_fsm.act("IDLE",
+            If(conf_source.valid,
+                NextState("CONF")
+            )
+        )
+        ptm_fsm.act("CONF",
+            conf_source.ready.eq(1),
+            If(conf_source.valid & conf_source.last,
+                NextState("COMP")
+            )
+        )
+        ptm_fsm.act("COMP",
+            comp_port.source.valid.eq(1),
+            comp_port.source.first.eq(1),
+            comp_port.source.last.eq(1),
+            comp_port.source.len.eq(1),
+            # FIXME: Verify required fields for the completion
+            comp_port.source.req_id.eq(conf_source.req_id), # FIXME.
+            If(comp_port.source.valid & comp_port.source.ready,
+                NextState("IDLE")
+            )
+        )
+
+        # PTM --------------------------------------------------------------------------------------
+
+        # TODO.
+
         # Analyzer ---------------------------------------------------------------------------------
 
         if with_msi_analyzer:
@@ -147,6 +182,18 @@ class BaseSoC(SoCMini):
                 self.pcie_msi.table_port.adr,
                 self.pcie_msi.table_port.dat_r,
                 self.pcie_phy.sink,
+            ]
+            self.analyzer = LiteScopeAnalyzer(analyzer_signals,
+                depth        = 512,
+                register     = True,
+                clock_domain = "sys",
+                csr_csv      = "analyzer.csv"
+            )
+
+        if with_ptm_analyzer:
+            analyzer_signals = [
+                self.pcie_endpoint.depacketizer.conf_source,
+                #self.pcie_endpoint.depacketizer.ptm_source,
             ]
             self.analyzer = LiteScopeAnalyzer(analyzer_signals,
                 depth        = 512,

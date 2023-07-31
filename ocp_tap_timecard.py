@@ -59,7 +59,7 @@ from litescope import LiteScopeAnalyzer
 
 class CRG(LiteXModule):
     def __init__(self, platform, sys_clk_freq):
-        self.rst          = Signal()
+        #self.rst          = Signal()
         self.cd_sys       = ClockDomain()
 
         # Clk/Rst
@@ -67,7 +67,7 @@ class CRG(LiteXModule):
 
         # PLL
         self.pll = pll = S7PLL()
-        self.comb += pll.reset.eq(self.rst)
+        #self.comb += pll.reset.eq(self.rst)
         pll.register_clkin(clk200, 200e6)
         pll.create_clkout(self.cd_sys, sys_clk_freq)
         platform.add_false_path_constraints(self.cd_sys.clk, pll.clkin) # Ignore sys_clk to pll.clkin path created by SoC's rst.
@@ -146,6 +146,10 @@ class BaseSoC(SoCMini):
         conf_source = self.pcie_endpoint.depacketizer.conf_source
 
         self.ptm_fsm = ptm_fsm = FSM(reset_state="IDLE")
+
+        tag    = Signal(8)
+        req_id = Signal(16)
+
         ptm_fsm.act("IDLE",
             If(conf_source.valid,
                 NextState("CONF")
@@ -154,6 +158,8 @@ class BaseSoC(SoCMini):
         ptm_fsm.act("CONF",
             conf_source.ready.eq(1),
             If(conf_source.valid & conf_source.last,
+                NextValue(tag, conf_source.tag),
+                NextValue(req_id, conf_source.req_id),
                 NextState("COMP")
             )
         )
@@ -162,8 +168,12 @@ class BaseSoC(SoCMini):
             comp_port.source.first.eq(1),
             comp_port.source.last.eq(1),
             comp_port.source.len.eq(1),
-            # FIXME: Verify required fields for the completion
-            comp_port.source.req_id.eq(conf_source.req_id), # FIXME.
+            comp_port.source.err.eq(0),
+            comp_port.source.tag.eq(tag),
+            comp_port.source.adr.eq(0),
+            comp_port.source.cmp_id.eq(self.pcie_endpoint.phy.id),
+            comp_port.source.req_id.eq(req_id),
+            comp_port.source.dat.eq(0),
             If(comp_port.source.valid & comp_port.source.ready,
                 NextState("IDLE")
             )

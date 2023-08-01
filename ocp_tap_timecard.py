@@ -149,6 +149,7 @@ class BaseSoC(SoCMini):
 
         tag    = Signal(8)
         req_id = Signal(16)
+        reg    = Signal(10)
 
         ptm_fsm.act("IDLE",
             If(conf_source.valid,
@@ -160,7 +161,12 @@ class BaseSoC(SoCMini):
             If(conf_source.valid & conf_source.last,
                 NextValue(tag, conf_source.tag),
                 NextValue(req_id, conf_source.req_id),
-                NextState("COMP")
+                NextValue(reg,   Cat(conf_source.register_no, conf_source.ext_reg)),
+                If(conf_source.we,
+                    NextState("IDLE")
+                ).Else(
+                    NextState("COMP")
+                )
             )
         )
         ptm_fsm.act("COMP",
@@ -173,7 +179,18 @@ class BaseSoC(SoCMini):
             comp_port.source.adr.eq(0),
             comp_port.source.cmp_id.eq(self.pcie_endpoint.phy.id),
             comp_port.source.req_id.eq(req_id),
-            comp_port.source.dat.eq(0),
+            # PCI Express Extended Capability Header.
+            If(reg == 0x6b,
+                comp_port.source.dat.eq(0x0001_001f),
+            ),
+            # PTM Capability Register.
+            If(reg == 0x6c,
+                comp_port.source.dat.eq(0x0000_0803), # Requester/Responder capable / 8ns.
+            ),
+            # PTM Control Register.
+            If(reg == 0x6d,
+                comp_port.source.dat.eq(0x0000_0000), # TODO.
+            ),
             If(comp_port.source.valid & comp_port.source.ready,
                 NextState("IDLE")
             )
@@ -182,6 +199,12 @@ class BaseSoC(SoCMini):
         # PTM --------------------------------------------------------------------------------------
 
         # TODO.
+
+        ptm_codes = {
+            "request"   : 0b01010010, # PTM Request.
+            "response"  : 0b01010011, # PTM Response without timing information.
+            "responsed" : 0b01010011, # PTM Response with timing information.
+        }
 
         # Analyzer ---------------------------------------------------------------------------------
 
@@ -203,7 +226,8 @@ class BaseSoC(SoCMini):
         if with_ptm_analyzer:
             analyzer_signals = [
                 self.pcie_endpoint.depacketizer.conf_source,
-                #self.pcie_endpoint.depacketizer.ptm_source,
+                comp_port.source,
+
             ]
             self.analyzer = LiteScopeAnalyzer(analyzer_signals,
                 depth        = 512,

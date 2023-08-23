@@ -80,10 +80,11 @@ class BaseSoC(SoCMini):
         "pcie_msi_table": 4, # Requires fixed mapping for MSI-X.
     }
     def __init__(self, sys_clk_freq=100e6, pcie_address_width=32, pcie_msi_type="msi-x", with_ptm=True,
-        with_jtagbone     = True,
-        with_led_chaser   = True,
-        with_msi_analyzer = False,
-        with_ptm_analyzer = True,
+        with_jtagbone          = True,
+        with_led_chaser        = True,
+        with_msi_analyzer      = False,
+        with_ptm_conf_analyzer = False,
+        with_ptm_req_analyzer  = True,
         **kwargs):
         platform = ocp_tap_timecard.Platform()
 
@@ -172,11 +173,22 @@ class BaseSoC(SoCMini):
                 csr_csv      = "analyzer.csv"
             )
 
-        if with_ptm_analyzer:
+        if with_ptm_conf_analyzer:
             analyzer_signals = [
                 self.ptm_capabilities.conf_ep,
                 self.ptm_capabilities.comp_ep,
 
+            ]
+            self.analyzer = LiteScopeAnalyzer(analyzer_signals,
+                depth        = 512,
+                register     = True,
+                clock_domain = "sys",
+                csr_csv      = "analyzer.csv"
+            )
+
+        if with_ptm_req_analyzer:
+            analyzer_signals = [
+                self.pcie_endpoint.depacketizer.ptm_source,
             ]
             self.analyzer = LiteScopeAnalyzer(analyzer_signals,
                 depth        = 512,

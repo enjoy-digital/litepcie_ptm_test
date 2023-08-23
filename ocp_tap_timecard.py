@@ -174,8 +174,8 @@ class BaseSoC(SoCMini):
 
         if with_ptm_analyzer:
             analyzer_signals = [
-                self.pcie_endpoint.depacketizer.conf_source,
-                self.ptm_capabilities.comp_port.source,
+                self.ptm_capabilities.conf_ep,
+                self.ptm_capabilities.comp_ep,
 
             ]
             self.analyzer = LiteScopeAnalyzer(analyzer_signals,

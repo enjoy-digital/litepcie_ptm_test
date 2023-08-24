@@ -34,8 +34,8 @@ PTM_CONTROL_EFFECTIVE_GRANULARITY_OFFSET = 8
 
 class PTMCapabilities(LiteXModule):
     def __init__(self, pcie_endpoint,
-        requester_capable = False,
-        responder_capable = True,
+        requester_capable = True,
+        responder_capable = False,
         root_capable      = False,
         clock_granularity = 8e-9,
     ):

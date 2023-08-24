@@ -9,6 +9,7 @@
 from migen import *
 
 from litex.gen import *
+from litex.gen.genlib.misc import WaitTimer
 
 # PTM Capabilities Constants -----------------------------------------------------------------------
 
@@ -123,3 +124,46 @@ class PTMCapabilities(LiteXModule):
             self.ptm_root_select.eq(          (mem_ctrl_port.dat_r >> PTM_CONTROL_ROOT_SELECT_OFFSET)           & 0b1),
             self.ptm_effective_granularity.eq((mem_ctrl_port.dat_r >> PTM_CONTROL_EFFECTIVE_GRANULARITY_OFFSET) & 0b1111_1111),
         ]
+
+# PTM Core Constants -------------------------------------------------------------------------------
+
+PTM_REQUEST_MESSAGE_CODE   = 0b01010010 # PTM Request.
+PTM_RESPONSE_MESSAGE_CODE  = 0b01010011 # PTM Response without timing information.
+PTM_RESPONSED_MESSAGE_CODE = 0b01010011 # PTM Response with timing information.
+
+# PTM Core -----------------------------------------------------------------------------------------
+
+class PTMCore(LiteXModule):
+    def __init__(self, pcie_endpoint, sys_clk_freq):
+        # Input.
+        self.ptm_enable = Signal()
+
+        # # #
+
+        # PTM Request Endpoint.
+        self.req_ep = req_ep = pcie_endpoint.packetizer.ptm_sink
+
+        # PTM Request Timer.
+        self.req_timer = req_timer = WaitTimer(1*sys_clk_freq)
+        self.comb += req_timer.wait.eq(~req_timer.done)
+
+        # PTM Request FSM.
+        self.fsm = fsm = FSM(reset_state="IDLE")
+        fsm.act("IDLE",
+            If(self.ptm_enable & req_timer.done,
+                NextState("REQUEST")
+            )
+        )
+        fsm.act("REQUEST",
+            req_ep.valid.eq(1),
+            req_ep.request.eq(1),
+            req_ep.response.eq(0),
+            req_ep.first.eq(1),
+            req_ep.last.eq(1),
+            req_ep.length.eq(0),
+            req_ep.requester_id.eq(pcie_endpoint.phy.id),
+            req_ep.message_code.eq(PTM_REQUEST_MESSAGE_CODE),
+            If(req_ep.ready,
+                NextState("IDLE")
+            )
+        )

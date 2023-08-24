@@ -50,7 +50,7 @@ from litex.soc.cores.dna  import DNA
 from litedram.modules import MT41K256M16
 from litedram.phy import s7ddrphy
 
-from litepcie.phy.s7pciephy import S7PCIEPHY
+from s7pciephy import S7PCIEPHY
 from litepcie.software import generate_litepcie_software
 
 from litescope import LiteScopeAnalyzer
@@ -184,16 +184,20 @@ class BaseSoC(SoCMini):
             )
 
         if with_ptm_tlp_analyzer:
+            data_last   = Signal(64)
+            data_change = Signal()
+            self.sync += data_last.eq(self.pcie_phy.source.dat)
+            self.sync += data_change.eq(self.pcie_phy.source.dat != data_last)
             analyzer_signals = [
                 self.ptm_capabilities.ptm_enable,
                 self.ptm_capabilities.ptm_root_select,
                 self.ptm_capabilities.ptm_effective_granularity,
                 self.ptm_core.req_timer.done,
                 self.ptm_core.fsm,
-                self.pcie_endpoint.packetizer.source,
-                self.pcie_endpoint.depacketizer.sink,
-                #self.pcie_endpoint.packetizer.ptm_sink,
-                #self.pcie_endpoint.depacketizer.ptm_source,
+                self.pcie_phy.source,
+                self.pcie_phy.sink,
+                self.pcie_phy.cfg_msg_received,
+                data_change,
             ]
             self.analyzer = LiteScopeAnalyzer(analyzer_signals,
                 depth        = 512,

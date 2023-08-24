@@ -151,7 +151,7 @@ class BaseSoC(SoCMini):
         from ptm import PTMCore
 
         self.ptm_core = PTMCore(self.pcie_endpoint, sys_clk_freq)
-        #self.comb += self.ptm_core.ptm_enable.eq(self.ptm_capabilities.ptm_enable)
+        self.comb += self.ptm_core.ptm_enable.eq(self.ptm_capabilities.ptm_enable)
 
         # Analyzer ---------------------------------------------------------------------------------
 
@@ -191,6 +191,7 @@ class BaseSoC(SoCMini):
                 self.ptm_core.req_timer.done,
                 self.ptm_core.fsm,
                 self.pcie_endpoint.packetizer.source,
+                self.pcie_endpoint.depacketizer.sink,
                 #self.pcie_endpoint.packetizer.ptm_sink,
                 #self.pcie_endpoint.depacketizer.ptm_source,
             ]

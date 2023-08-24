@@ -11,8 +11,6 @@ from migen import *
 from litex.gen import *
 from litex.gen.genlib.misc import WaitTimer
 
-from litex.soc.interconnect.csr import *
-
 # PTM Capabilities Constants -----------------------------------------------------------------------
 
 PTM_STRUCTURE_REGS = 3
@@ -138,7 +136,7 @@ PTM_RESPONSED_MESSAGE_CODE = 0b01010011 # PTM Response with timing information.
 class PTMCore(LiteXModule):
     def __init__(self, pcie_endpoint, sys_clk_freq):
         # Input.
-        self.ptm_enable = CSRStorage()
+        self.ptm_enable = Signal()
 
         # # #
 
@@ -152,7 +150,7 @@ class PTMCore(LiteXModule):
         # PTM Request FSM.
         self.fsm = fsm = FSM(reset_state="IDLE")
         fsm.act("IDLE",
-            If(self.ptm_enable.storage & req_timer.done,
+            If(self.ptm_enable & req_timer.done,
                 NextState("REQUEST")
             )
         )

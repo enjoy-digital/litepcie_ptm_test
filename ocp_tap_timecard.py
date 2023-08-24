@@ -84,7 +84,7 @@ class BaseSoC(SoCMini):
         with_led_chaser        = True,
         with_msi_analyzer      = False,
         with_ptm_conf_analyzer = False,
-        with_ptm_req_analyzer  = True,
+        with_ptm_tlp_analyzer  = True,
         **kwargs):
         platform = ocp_tap_timecard.Platform()
 
@@ -148,13 +148,10 @@ class BaseSoC(SoCMini):
 
         # PTM --------------------------------------------------------------------------------------
 
-        # TODO.
+        from ptm import PTMCore
 
-        ptm_codes = {
-            "request"   : 0b01010010, # PTM Request.
-            "response"  : 0b01010011, # PTM Response without timing information.
-            "responsed" : 0b01010011, # PTM Response with timing information.
-        }
+        self.ptm_core = PTMCore(self.pcie_endpoint, sys_clk_freq)
+        self.comb += self.ptm_core.ptm_enable.eq(self.ptm_capabilities.ptm_enable)
 
         # Analyzer ---------------------------------------------------------------------------------
 
@@ -186,9 +183,16 @@ class BaseSoC(SoCMini):
                 csr_csv      = "analyzer.csv"
             )
 
-        if with_ptm_req_analyzer:
+        if with_ptm_tlp_analyzer:
             analyzer_signals = [
-                self.pcie_endpoint.depacketizer.ptm_source,
+                self.ptm_capabilities.ptm_enable,
+                self.ptm_capabilities.ptm_root_select,
+                self.ptm_capabilities.ptm_effective_granularity,
+                self.ptm_core.req_timer.done,
+                self.ptm_core.fsm,
+                self.pcie_endpoint.packetizer.source,
+                #self.pcie_endpoint.packetizer.ptm_sink,
+                #self.pcie_endpoint.depacketizer.ptm_source,
             ]
             self.analyzer = LiteScopeAnalyzer(analyzer_signals,
                 depth        = 512,

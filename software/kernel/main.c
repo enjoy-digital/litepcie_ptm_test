@@ -1040,6 +1040,12 @@ static int litepcie_pci_probe(struct pci_dev *dev, const struct pci_device_id *i
 		fpga_identifier[i] = litepcie_readl(litepcie_dev, CSR_IDENTIFIER_MEM_BASE + i*4);
 	dev_info(&dev->dev, "Version %s\n", fpga_identifier);
 
+	ret = pci_enable_ptm(dev, NULL);
+	if (ret < 0)
+		dev_info(&dev->dev, "PCIe PTM not supported by PCIe bus/controller\n");
+	else
+		dev_info(&dev->dev, "PCIe PTM supported by PCIe bus/controller\n");
+
 	pci_set_master(dev);
 #if LINUX_VERSION_CODE < KERNEL_VERSION(5, 18, 0)
 	ret = pci_set_dma_mask(dev, DMA_BIT_MASK(DMA_ADDR_WIDTH));

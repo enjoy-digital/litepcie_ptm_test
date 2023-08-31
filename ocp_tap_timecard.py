@@ -80,11 +80,12 @@ class BaseSoC(SoCMini):
         "pcie_msi_table": 4, # Requires fixed mapping for MSI-X.
     }
     def __init__(self, sys_clk_freq=100e6, pcie_address_width=32, pcie_msi_type="msi-x", with_ptm=True,
-        with_jtagbone          = True,
-        with_led_chaser        = True,
-        with_msi_analyzer      = False,
-        with_ptm_conf_analyzer = False,
-        with_ptm_tlp_analyzer  = True,
+        with_jtagbone           = True,
+        with_led_chaser         = True,
+        with_msi_analyzer       = False,
+        with_ptm_conf_analyzer  = False,
+        with_ptm_tlp_analyzer   = False,
+        with_pcie_gtp_analyzer  = True,
         **kwargs):
         platform = ocp_tap_timecard.Platform()
 
@@ -205,6 +206,37 @@ class BaseSoC(SoCMini):
                 clock_domain = "sys",
                 csr_csv      = "analyzer.csv"
             )
+
+        if with_pcie_gtp_analyzer:
+            # PCIe Signals to observe.
+            tx_ctrl = Signal(4)
+            tx_data = Signal(4)
+            rx_ctrl = Signal(4)
+            rx_data = Signal(4)
+            # Dummy logic to prevent synthesis optimizations.
+            self.sync +=  [
+                tx_ctrl.eq(tx_ctrl + 1),
+                tx_data.eq(tx_data + 1),
+                rx_ctrl.eq(rx_ctrl + 1),
+                rx_data.eq(rx_data + 1),
+            ]
+            # Analyzer
+            analyzer_signals = [
+                tx_ctrl,
+                tx_data,
+                rx_ctrl,
+                rx_data,
+            ]
+            self.analyzer = LiteScopeAnalyzer(analyzer_signals,
+                depth        = 1024,
+                register     = True,
+                clock_domain = "sys",
+                csr_csv      = "analyzer.csv"
+            )
+            # Magic .tcl commands to connect internals PCIe signals to LiteScope.
+            # TODO.
+            #platform.toolchain.pre_placement_commands.append("disconnect_net ...")
+            #platform.toolchain.pre_placement_commands.append("connect_net ...")
 
 # Build --------------------------------------------------------------------------------------------
 

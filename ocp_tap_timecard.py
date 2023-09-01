@@ -212,12 +212,42 @@ class BaseSoC(SoCMini):
         if with_pcie_gtp_analyzer:
             self.cd_debug = ClockDomain()
             self.comb += self.cd_debug.clk.eq(self.pcie_phy.debug_clk)
+
+            def pcie_layout(data_width):
+                return [
+                    ("data", data_width),
+                    ("ctl", data_width//8),
+                ]
+            self.tx_converter = ClockDomainsRenamer("debug")(stream.StrideConverter(
+                description_from = pcie_layout(16),
+                description_to   = pcie_layout(32),
+                reverse          = False,
+            ))
+            self.rx_converter = ClockDomainsRenamer("debug")(stream.StrideConverter(
+                description_from = pcie_layout(16),
+                description_to   = pcie_layout(32),
+                reverse          = False,
+            ))
+            self.comb += [
+                self.tx_converter.sink.valid.eq(1),
+                self.tx_converter.sink.data.eq(self.pcie_phy.debug_tx_data),
+                self.tx_converter.sink.ctl.eq(self.pcie_phy.debug_tx_ctl),
+                self.tx_converter.source.ready.eq(1),
+
+                self.rx_converter.sink.valid.eq(1),
+                self.rx_converter.sink.data.eq(self.pcie_phy.debug_rx_data),
+                self.rx_converter.sink.ctl.eq(self.pcie_phy.debug_rx_ctl),
+                self.rx_converter.source.ready.eq(1),
+            ]
+
             # Analyzer
             analyzer_signals = [
                 self.pcie_phy.debug_tx_data,
                 self.pcie_phy.debug_tx_ctl,
                 self.pcie_phy.debug_rx_data,
                 self.pcie_phy.debug_rx_ctl,
+                self.tx_converter.source,
+                self.rx_converter.source,
             ]
             self.analyzer = LiteScopeAnalyzer(analyzer_signals,
                 depth        = 4096,

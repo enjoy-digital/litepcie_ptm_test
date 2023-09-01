@@ -128,18 +128,20 @@ class BaseSoC(SoCMini):
         self.add_pcie(phy=self.pcie_phy, ndmas=1, address_width=pcie_address_width, msi_type=pcie_msi_type, with_ptm=with_ptm)
         # FIXME: Apply it to all targets (integrate it in LitePCIe?).
         platform.add_period_constraint(self.crg.cd_sys.clk, 1e9/sys_clk_freq)
+        platform.toolchain.pre_placement_commands.append("read_xdc /home/florent/dev/meta/litepcie_ptm/gateware/pcie/ip/pcie_s7/source/pcie_s7-PCIE_X0Y0.xdc")
+        platform.toolchain.pre_placement_commands.append("read_xdc /home/florent/dev/meta/litepcie_ptm/gateware/pcie/ip/pcie_s7/synth/pcie_s7_ooc.xdc")
         platform.toolchain.pre_placement_commands.append("reset_property LOC [get_cells -hierarchical -filter {{NAME=~*gtp_channel.gtpe2_channel_i}}]")
         platform.toolchain.pre_placement_commands.append("set_property LOC GTPE2_CHANNEL_X0Y5 [get_cells -hierarchical -filter {{NAME=~*gtp_channel.gtpe2_channel_i}}]")
 
-#        # PCIe <-> Sys-Clk false paths.
-#        false_paths = [
-#            ("s7pciephy_clkout0", "sys_clk"),
-#            ("s7pciephy_clkout1", "sys_clk"),
-#            ("s7pciephy_clkout3", "sys_clk"),
-#        ]
-#        for clk0, clk1 in false_paths:
-#            platform.toolchain.pre_placement_commands.append(f"set_false_path -from [get_clocks {clk0}] -to [get_clocks {clk1}]")
-#            platform.toolchain.pre_placement_commands.append(f"set_false_path -from [get_clocks {clk1}] -to [get_clocks {clk0}]")
+        # PCIe <-> Sys-Clk false paths.
+        false_paths = [
+            ("s7pciephy_clkout0", "sys_clk"),
+            ("s7pciephy_clkout1", "sys_clk"),
+            ("s7pciephy_clkout3", "sys_clk"),
+        ]
+        for clk0, clk1 in false_paths:
+            platform.toolchain.pre_placement_commands.append(f"set_false_path -from [get_clocks {clk0}] -to [get_clocks {clk1}]")
+            platform.toolchain.pre_placement_commands.append(f"set_false_path -from [get_clocks {clk1}] -to [get_clocks {clk0}]")
 
         # PTM capabilities -------------------------------------------------------------------------
 

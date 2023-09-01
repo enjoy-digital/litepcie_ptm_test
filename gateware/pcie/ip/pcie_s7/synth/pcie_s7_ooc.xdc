@@ -57,20 +57,20 @@
 # This constraints file is not used in normal top-down synthesis (the default flow of Vivado)
 
 #
-create_clock -name pcie_s7_sys_clk -period 10 [get_ports sys_clk]
+create_clock -name pcie_s7_sys_clk -period 10 [get_ports pcie_s7/sys_clk]
 # 100/125/250 MHz
 
-create_clock -name pcie_s7_pclk -period 4 [get_ports pipe_pclk_in]
+create_clock -name pcie_s7_pclk -period 4 [get_ports pcie_s7/pipe_pclk_in]
 # 125/250 MHz
 
-create_clock -name pcie_s7_rxusrclk -period 4 [get_ports pipe_rxusrclk_in]
+create_clock -name pcie_s7_rxusrclk -period 4 [get_ports pcie_s7/pipe_rxusrclk_in]
 # 125/250 MHz 
 
-create_clock -name pcie_s7_dclk -period 8 [get_ports pipe_dclk_in]
+create_clock -name pcie_s7_dclk -period 8 [get_ports pcie_s7/pipe_dclk_in]
 # 125 MHz
 
-create_clock -name pcie_s7_usrclk1 -period 8 [get_ports pipe_userclk1_in]
-create_clock -name pcie_s7_usrclk2 -period 8 [get_ports pipe_userclk2_in]
+create_clock -name pcie_s7_usrclk1 -period 8 [get_ports pcie_s7/pipe_userclk1_in]
+create_clock -name pcie_s7_usrclk2 -period 8 [get_ports pcie_s7/pipe_userclk2_in]
 
-create_clock -name pcie_s7_oobclk -period 4 [get_ports pipe_oobclk_in]
+create_clock -name pcie_s7_oobclk -period 4 [get_ports pcie_s7/pipe_oobclk_in]
 # 50 MHz , 125/250 MHz

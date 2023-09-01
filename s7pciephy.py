@@ -441,72 +441,77 @@ class S7PCIEPHY(LiteXModule):
         self.ltssm_tracer = LTSSMTracer(self._link_status.fields.ltssm)
 
     # Hard IP sources ------------------------------------------------------------------------------
-    def add_sources(self, platform, phy_path, phy_filename=None):
-        if phy_filename is not None:
-            platform.add_ip(os.path.join(phy_path, phy_filename))
+    def add_sources(self, platform, phy_path, phy_filename=None, use_generated_verilog=True):
+        if not use_generated_verilog:
+            if phy_filename is not None:
+                platform.add_ip(os.path.join(phy_path, phy_filename))
+            else:
+                # Global parameters.
+                config = {
+                    "Bar0_Scale"         : "Megabytes",
+                    "Bar0_Size"          : 1,
+                    "Buf_Opt_BMA"        : True,
+                    "Component_Name"     : "pcie",
+                    "Device_ID"          : 7020 + self.nlanes,
+                    "Interface_Width"    : f"{self.pcie_data_width}_bit",
+                    "Link_Speed"         : "5.0_GT/s",
+                    "Max_Payload_Size"   : "512_bytes" if self.nlanes != 8 else "256_bytes",
+                    "Maximum_Link_Width" : f"X{self.nlanes}",
+                    "PCIe_Blk_Locn"      : "X0Y0",
+                    "Ref_Clk_Freq"       : "100_MHz",
+                    "Trans_Buf_Pipeline" : None,
+                    "Trgt_Link_Speed"    : "4'h2",
+                    "User_Clk_Freq"      : 125 if self.nlanes != 8 else 250,
+                }
+
+                # Interrupts parameters.
+                assert self.msi_type in ["msi", "msi-multi-vector", "msi-x"]
+                config.update({
+                        "Legacy_Interrupt" : None,
+                        "IntX_Generation"  : False,
+                })
+                if self.msi_type == "msi":
+                    config.update({
+                        "MSI_64b"                  : False,
+                        "Multiple_Message_Capable" : "1_vector",
+                    })
+                if self.msi_type == "msi-multi-vector":
+                    config.update({
+                        "MSI_64b"                  : False,
+                        "Multiple_Message_Capable" : "1_vector", # FIXME.
+                    })
+                if self.msi_type == "msi-x":
+                    config.update({
+                        "mode_selection"    : "Advanced",
+                        "MSI_Enabled"       : False,
+                        "MSIx_Enabled"      : True,
+                        "MSIx_Table_Size"   : "20",   # Hexa.
+                        "MSIx_Table_Offset" : "2000", # Hexa, should match CSR_PCIE_MSI_TABLE_BASE.
+                        "MSIx_PBA_Offset"   : "1808", # Hexa, should match CSR_PCIE_MSI_PBA_ADDR.
+                    })
+
+                # Extended Capabilities Registers.
+                if self.with_ptm:
+                    config.update({
+                        "EXT_PCI_CFG_Space"      : True,
+                        "EXT_PCI_CFG_Space_Addr" : "6B", # 0x1AC.
+                        "En_route_unlock"        : True,
+                    })
+
+                # Tcl generation.
+                ip_tcl = []
+                ip_tcl.append("create_ip -vendor xilinx.com -name pcie_7x -module_name pcie_s7")
+                ip_tcl.append("set obj [get_ips pcie_s7]")
+                ip_tcl.append("set_property -dict [list \\")
+                for config, value in config.items():
+                    ip_tcl.append("CONFIG.{} {} \\".format(config, '{{' + str(value) + '}}'))
+                ip_tcl.append(f"] $obj")
+                ip_tcl.append("synth_ip $obj")
+                platform.toolchain.pre_synthesis_commands += ip_tcl
+        # use generated verilog
         else:
-            # Global parameters.
-            config = {
-                "Bar0_Scale"         : "Megabytes",
-                "Bar0_Size"          : 1,
-                "Buf_Opt_BMA"        : True,
-                "Component_Name"     : "pcie",
-                "Device_ID"          : 7020 + self.nlanes,
-                "Interface_Width"    : f"{self.pcie_data_width}_bit",
-                "Link_Speed"         : "5.0_GT/s",
-                "Max_Payload_Size"   : "512_bytes" if self.nlanes != 8 else "256_bytes",
-                "Maximum_Link_Width" : f"X{self.nlanes}",
-                "PCIe_Blk_Locn"      : "X0Y0",
-                "Ref_Clk_Freq"       : "100_MHz",
-                "Trans_Buf_Pipeline" : None,
-                "Trgt_Link_Speed"    : "4'h2",
-                "User_Clk_Freq"      : 125 if self.nlanes != 8 else 250,
-            }
-
-            # Interrupts parameters.
-            assert self.msi_type in ["msi", "msi-multi-vector", "msi-x"]
-            config.update({
-                    "Legacy_Interrupt" : None,
-                    "IntX_Generation"  : False,
-            })
-            if self.msi_type == "msi":
-                config.update({
-                    "MSI_64b"                  : False,
-                    "Multiple_Message_Capable" : "1_vector",
-                })
-            if self.msi_type == "msi-multi-vector":
-                config.update({
-                    "MSI_64b"                  : False,
-                    "Multiple_Message_Capable" : "1_vector", # FIXME.
-                })
-            if self.msi_type == "msi-x":
-                config.update({
-                    "mode_selection"    : "Advanced",
-                    "MSI_Enabled"       : False,
-                    "MSIx_Enabled"      : True,
-                    "MSIx_Table_Size"   : "20",   # Hexa.
-                    "MSIx_Table_Offset" : "2000", # Hexa, should match CSR_PCIE_MSI_TABLE_BASE.
-                    "MSIx_PBA_Offset"   : "1808", # Hexa, should match CSR_PCIE_MSI_PBA_ADDR.
-                })
-
-            # Extended Capabilities Registers.
-            if self.with_ptm:
-                config.update({
-                    "EXT_PCI_CFG_Space"      : True,
-                    "EXT_PCI_CFG_Space_Addr" : "6B", # 0x1AC.
-                    "En_route_unlock"        : True,
-                })
-
-            # Tcl generation.
-            ip_tcl = []
-            ip_tcl.append("create_ip -vendor xilinx.com -name pcie_7x -module_name pcie_s7")
-            ip_tcl.append("set obj [get_ips pcie_s7]")
-            ip_tcl.append("set_property -dict [list \\")
-            for config, value in config.items():
-                ip_tcl.append("CONFIG.{} {} \\".format(config, '{{' + str(value) + '}}'))
-            ip_tcl.append(f"] $obj")
-            ip_tcl.append("synth_ip $obj")
-            platform.toolchain.pre_synthesis_commands += ip_tcl
+            platform.add_source_dir("gateware/pcie/ip/pcie_s7/source")
+            platform.add_source_dir("gateware/pcie/ip/pcie_s7/synth")
 
         # Reset LOC constraints on GTPE2_COMMON and BRAM36 from .xci (we only want to keep Timing constraints).
         if platform.device.startswith("xc7a"):

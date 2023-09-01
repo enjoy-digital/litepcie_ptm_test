@@ -131,15 +131,15 @@ class BaseSoC(SoCMini):
         platform.toolchain.pre_placement_commands.append("reset_property LOC [get_cells -hierarchical -filter {{NAME=~*gtp_channel.gtpe2_channel_i}}]")
         platform.toolchain.pre_placement_commands.append("set_property LOC GTPE2_CHANNEL_X0Y5 [get_cells -hierarchical -filter {{NAME=~*gtp_channel.gtpe2_channel_i}}]")
 
-        # PCIe <-> Sys-Clk false paths.
-        false_paths = [
-            ("s7pciephy_clkout0", "sys_clk"),
-            ("s7pciephy_clkout1", "sys_clk"),
-            ("s7pciephy_clkout3", "sys_clk"),
-        ]
-        for clk0, clk1 in false_paths:
-            platform.toolchain.pre_placement_commands.append(f"set_false_path -from [get_clocks {clk0}] -to [get_clocks {clk1}]")
-            platform.toolchain.pre_placement_commands.append(f"set_false_path -from [get_clocks {clk1}] -to [get_clocks {clk0}]")
+#        # PCIe <-> Sys-Clk false paths.
+#        false_paths = [
+#            ("s7pciephy_clkout0", "sys_clk"),
+#            ("s7pciephy_clkout1", "sys_clk"),
+#            ("s7pciephy_clkout3", "sys_clk"),
+#        ]
+#        for clk0, clk1 in false_paths:
+#            platform.toolchain.pre_placement_commands.append(f"set_false_path -from [get_clocks {clk0}] -to [get_clocks {clk1}]")
+#            platform.toolchain.pre_placement_commands.append(f"set_false_path -from [get_clocks {clk1}] -to [get_clocks {clk0}]")
 
         # PTM capabilities -------------------------------------------------------------------------
 

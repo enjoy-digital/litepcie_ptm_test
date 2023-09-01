@@ -213,31 +213,19 @@ class BaseSoC(SoCMini):
             self.cd_debug = ClockDomain()
             self.comb += self.cd_debug.clk.eq(self.pcie_phy.debug_clk)
 
-            def pcie_layout(data_width):
-                return [
-                    ("data", data_width),
-                    ("ctl", data_width//8),
-                ]
-            self.tx_converter = ClockDomainsRenamer("debug")(stream.StrideConverter(
-                description_from = pcie_layout(16),
-                description_to   = pcie_layout(32),
-                reverse          = False,
-            ))
-            self.rx_converter = ClockDomainsRenamer("debug")(stream.StrideConverter(
-                description_from = pcie_layout(16),
-                description_to   = pcie_layout(32),
-                reverse          = False,
-            ))
+            from gateware.serdes import RXDatapath
+            self.tx_datapath = RXDatapath(clock_domain="debug", phy_dw=16)
+            self.rx_datapath = RXDatapath(clock_domain="debug", phy_dw=16)
             self.comb += [
-                self.tx_converter.sink.valid.eq(1),
-                self.tx_converter.sink.data.eq(self.pcie_phy.debug_tx_data),
-                self.tx_converter.sink.ctl.eq(self.pcie_phy.debug_tx_ctl),
-                self.tx_converter.source.ready.eq(1),
+                self.tx_datapath.sink.valid.eq(1),
+                self.tx_datapath.sink.data.eq(self.pcie_phy.debug_tx_data),
+                self.tx_datapath.sink.ctrl.eq(self.pcie_phy.debug_tx_ctl),
+                self.tx_datapath.source.ready.eq(1),
 
-                self.rx_converter.sink.valid.eq(1),
-                self.rx_converter.sink.data.eq(self.pcie_phy.debug_rx_data),
-                self.rx_converter.sink.ctl.eq(self.pcie_phy.debug_rx_ctl),
-                self.rx_converter.source.ready.eq(1),
+                self.rx_datapath.sink.valid.eq(1),
+                self.rx_datapath.sink.data.eq(self.pcie_phy.debug_rx_data),
+                self.rx_datapath.sink.ctrl.eq(self.pcie_phy.debug_rx_ctl),
+                self.rx_datapath.source.ready.eq(1),
             ]
 
             # Analyzer
@@ -246,14 +234,23 @@ class BaseSoC(SoCMini):
                 self.pcie_phy.debug_tx_ctl,
                 self.pcie_phy.debug_rx_data,
                 self.pcie_phy.debug_rx_ctl,
-                self.tx_converter.source,
-                self.rx_converter.source,
             ]
             self.analyzer = LiteScopeAnalyzer(analyzer_signals,
                 depth        = 4096,
                 register     = True,
                 clock_domain = "debug",
                 csr_csv      = "analyzer.csv"
+            )
+
+            sys_analyzer_signals = [
+                self.tx_datapath.source,
+                self.rx_datapath.source,
+            ]
+            self.sys_analyzer = LiteScopeAnalyzer(sys_analyzer_signals,
+                depth        = 4096,
+                register     = True,
+                clock_domain = "sys",
+                csr_csv      = "sys_analyzer.csv"
             )
 
 # Build --------------------------------------------------------------------------------------------

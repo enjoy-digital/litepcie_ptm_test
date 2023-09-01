@@ -50,7 +50,7 @@ from litex.soc.cores.dna  import DNA
 from litedram.modules import MT41K256M16
 from litedram.phy import s7ddrphy
 
-from s7pciephy import S7PCIEPHY
+from gateware.pcie.s7pciephy import S7PCIEPHY
 from litepcie.software import generate_litepcie_software
 
 from litescope import LiteScopeAnalyzer

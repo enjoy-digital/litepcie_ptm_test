@@ -210,35 +210,21 @@ class BaseSoC(SoCMini):
             )
 
         if with_pcie_gtp_analyzer:
-            # PCIe Signals to observe.
-            tx_ctrl = Signal(4)
-            tx_data = Signal(4)
-            rx_ctrl = Signal(4)
-            rx_data = Signal(4)
-            # Dummy logic to prevent synthesis optimizations.
-            self.sync +=  [
-                tx_ctrl.eq(tx_ctrl + 1),
-                tx_data.eq(tx_data + 1),
-                rx_ctrl.eq(rx_ctrl + 1),
-                rx_data.eq(rx_data + 1),
-            ]
+            self.cd_debug = ClockDomain()
+            self.comb += self.cd_debug.clk.eq(self.pcie_phy.debug_clk)
             # Analyzer
             analyzer_signals = [
-                tx_ctrl,
-                tx_data,
-                rx_ctrl,
-                rx_data,
+                self.pcie_phy.debug_tx_data,
+                self.pcie_phy.debug_tx_ctl,
+                self.pcie_phy.debug_rx_data,
+                self.pcie_phy.debug_rx_ctl,
             ]
             self.analyzer = LiteScopeAnalyzer(analyzer_signals,
-                depth        = 1024,
+                depth        = 4096,
                 register     = True,
-                clock_domain = "sys",
+                clock_domain = "debug",
                 csr_csv      = "analyzer.csv"
             )
-            # Magic .tcl commands to connect internals PCIe signals to LiteScope.
-            # TODO.
-            #platform.toolchain.pre_placement_commands.append("disconnect_net ...")
-            #platform.toolchain.pre_placement_commands.append("connect_net ...")
 
 # Build --------------------------------------------------------------------------------------------
 

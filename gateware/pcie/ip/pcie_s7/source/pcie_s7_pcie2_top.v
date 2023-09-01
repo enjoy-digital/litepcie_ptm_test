@@ -692,8 +692,13 @@ parameter     REDUCE_OOB_FREQ = "FALSE"
   //----------------------------------------------------------------------------------------------------------------//
   input wire           pipe_mmcm_rst_n,        // Async      | Async
   input wire           sys_clk,
-  input wire           sys_rst_n
+  input wire           sys_rst_n,
 
+  output wire debug_clk,
+  output wire [15 : 0] debug_tx_data,
+  output wire [1  : 0] debug_tx_ctl,
+  output wire [15 : 0] debug_rx_data,
+  output wire [1  : 0] debug_rx_ctl
 );
 
 pcie_s7_core_top  # (
@@ -1009,7 +1014,15 @@ pcie_s7_core_top  # (
 
     .pipe_mmcm_rst_n                            (pipe_mmcm_rst_n),        // Async      | Async
     .sys_clk                                    (sys_clk),
-    .sys_rst_n                                  (sys_rst_n)
+    .sys_rst_n                                  (sys_rst_n),
+
+
+    .debug_clk(debug_clk),
+    .debug_tx_data(debug_tx_data),
+    .debug_tx_ctl(debug_tx_ctl),
+    .debug_rx_data(debug_rx_data),
+    .debug_rx_ctl(debug_rx_ctl)
+
   );
 
 endmodule

@@ -206,6 +206,12 @@ class S7PCIEPHY(LiteXModule):
 
         self.cfg_msg_received = Signal()
 
+        self.debug_clk     = Signal()
+        self.debug_tx_data = Signal(16)
+        self.debug_tx_ctl  = Signal(4)
+        self.debug_rx_data = Signal(16)
+        self.debug_rx_ctl  = Signal(4)
+
         self.pcie_phy_params = dict(
             #p_c_enable_msg_route = "11111111111",
             # PCI Express Interface ----------------------------------------------------------------
@@ -421,6 +427,12 @@ class S7PCIEPHY(LiteXModule):
             i_pcie_drp_di   = 0,
             o_pcie_drp_rdy  = Open(),
             o_pcie_drp_do   = Open(),
+
+            o_debug_clk     = self.debug_clk,
+            o_debug_tx_data = self.debug_tx_data,
+            o_debug_tx_ctl  = self.debug_tx_ctl,
+            o_debug_rx_data = self.debug_rx_data,
+            o_debug_rx_ctl  = self.debug_rx_ctl,
         )
         if pcie_data_width == 128:
             rx_is_sof = m_axis_rx_tuser[10:15] # Start of a new packet header in m_axis_rx_tdata.

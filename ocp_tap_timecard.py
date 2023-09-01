@@ -214,43 +214,29 @@ class BaseSoC(SoCMini):
             self.comb += self.cd_debug.clk.eq(self.pcie_phy.debug_clk)
 
             from gateware.serdes import RXDatapath
-            self.tx_datapath = RXDatapath(clock_domain="debug", phy_dw=16)
-            self.rx_datapath = RXDatapath(clock_domain="debug", phy_dw=16)
+            from gateware.scrambling import Descrambler
+            self.rx_datapath    = ClockDomainsRenamer("debug")(RXDatapath(phy_dw=16))
+            self.rx_descrambler = ClockDomainsRenamer("debug")(Descrambler())
             self.comb += [
-                self.tx_datapath.sink.valid.eq(1),
-                self.tx_datapath.sink.data.eq(self.pcie_phy.debug_tx_data),
-                self.tx_datapath.sink.ctrl.eq(self.pcie_phy.debug_tx_ctl),
-                self.tx_datapath.source.ready.eq(1),
-
                 self.rx_datapath.sink.valid.eq(1),
                 self.rx_datapath.sink.data.eq(self.pcie_phy.debug_rx_data),
                 self.rx_datapath.sink.ctrl.eq(self.pcie_phy.debug_rx_ctl),
-                self.rx_datapath.source.ready.eq(1),
+                self.rx_datapath.source.connect(self.rx_descrambler.sink),
+                self.rx_descrambler.source.ready.eq(1),
             ]
 
             # Analyzer
             analyzer_signals = [
-                self.pcie_phy.debug_tx_data,
-                self.pcie_phy.debug_tx_ctl,
                 self.pcie_phy.debug_rx_data,
                 self.pcie_phy.debug_rx_ctl,
+                #self.rx_datapath.source,
+                self.rx_descrambler.source,
             ]
             self.analyzer = LiteScopeAnalyzer(analyzer_signals,
                 depth        = 4096,
                 register     = True,
                 clock_domain = "debug",
                 csr_csv      = "analyzer.csv"
-            )
-
-            sys_analyzer_signals = [
-                self.tx_datapath.source,
-                self.rx_datapath.source,
-            ]
-            self.sys_analyzer = LiteScopeAnalyzer(sys_analyzer_signals,
-                depth        = 4096,
-                register     = True,
-                clock_domain = "sys",
-                csr_csv      = "sys_analyzer.csv"
             )
 
 # Build --------------------------------------------------------------------------------------------

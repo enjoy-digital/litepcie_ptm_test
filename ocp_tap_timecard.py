@@ -145,13 +145,13 @@ class BaseSoC(SoCMini):
 
         # PTM capabilities -------------------------------------------------------------------------
 
-        from ptm import PTMCapabilities
+        from gateware.ptm import PTMCapabilities
 
         self.ptm_capabilities = PTMCapabilities(self.pcie_endpoint)
 
         # PTM --------------------------------------------------------------------------------------
 
-        from ptm import PTMCore
+        from gateware.ptm import PTMCore
 
         self.ptm_core = PTMCore(self.pcie_endpoint, sys_clk_freq)
         self.comb += self.ptm_core.ptm_enable.eq(self.ptm_capabilities.ptm_enable)

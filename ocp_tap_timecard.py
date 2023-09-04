@@ -239,9 +239,11 @@ class BaseSoC(SoCMini):
             # Analyzer
             analyzer_signals = [
                 self.ptm_core.fsm,
-                #self.ptm_core.req_timer.done,
+                self.ptm_core.req_timer.done,
                 #self.rx_descrambler.source,
                 #self.tx_descrambler.source,
+                #self.rx_datapath.skip_remover.skip,
+                #self.tx_datapath.skip_remover.skip,
                 self.pcie_phy.debug_rx_data,
                 self.pcie_phy.debug_rx_ctl,
                 self.pcie_phy.debug_tx_data,

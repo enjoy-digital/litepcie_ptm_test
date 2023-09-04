@@ -239,9 +239,13 @@ class BaseSoC(SoCMini):
             # Analyzer
             analyzer_signals = [
                 self.ptm_core.fsm,
-                self.ptm_core.req_timer.done,
-                self.rx_descrambler.source,
-                self.tx_descrambler.source,
+                #self.ptm_core.req_timer.done,
+                #self.rx_descrambler.source,
+                #self.tx_descrambler.source,
+                self.pcie_phy.debug_rx_data,
+                self.pcie_phy.debug_rx_ctl,
+                self.pcie_phy.debug_tx_data,
+                self.pcie_phy.debug_tx_ctl,
             ]
             self.analyzer = LiteScopeAnalyzer(analyzer_signals,
                 depth        = 8192,

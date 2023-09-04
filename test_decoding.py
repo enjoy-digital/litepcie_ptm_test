@@ -14,8 +14,8 @@ from gateware.scrambling import Descrambler
 
 def data_generator(dut, length=4096):
     yield dut.source.ready.eq(1)
-    rx_data = dump["s7pciephy_debug_rx_data"][:length]
-    rx_ctrl = dump["s7pciephy_debug_rx_ctl"][:length]
+    rx_data = dump["s7pciephy_debug_tx_data"][:length:2]
+    rx_ctrl = dump["s7pciephy_debug_tx_ctl"][:length:2]
     for data, ctrl in zip(rx_data, rx_ctrl):
         yield dut.sink.data.eq(data)
         yield dut.sink.ctrl.eq(ctrl)

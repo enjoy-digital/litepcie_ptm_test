@@ -143,5 +143,6 @@ class Descrambler(Module):
         # Descramble data
         self.comb += [
             sink.connect(scrambler.sink),
-            scrambler.source.connect(source)
+            scrambler.source.connect(source, omit={"data"}),
+            If(source.valid, source.data.eq(scrambler.source.data)),
         ]

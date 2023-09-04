@@ -146,7 +146,7 @@ class RXWordAligner(Module):
                 source.data.eq(data[8*i:]),
                 source.ctrl.eq(ctrl[i:]),
             ]
-        self.comb += Case(alignment_d, cases)
+        self.comb += If(source.valid, Case(alignment_d, cases))
 
 # RXErrorSubstitution (6.3.5) ----------------------------------------------------------------------
 
@@ -308,8 +308,11 @@ class RXDatapath(Module):
         self.submodules.converter = converter
 
         # Clock domain crossing
-        cdc = stream.AsyncFIFO([("data", 32), ("ctrl", 4)], 8, buffered=True)
-        cdc = ClockDomainsRenamer({"write": clock_domain, "read": "sys"})(cdc)
+        if clock_domain != "sys":
+            cdc = stream.AsyncFIFO([("data", 32), ("ctrl", 4)], 8, buffered=True)
+            cdc = ClockDomainsRenamer({"write": clock_domain, "read": "sys"})(cdc)
+        else:
+            cdc = stream.Buffer([("data", 32), ("ctrl", 4)])
         self.submodules.cdc = cdc
 
         # Clock compensation
@@ -318,17 +321,18 @@ class RXDatapath(Module):
 
         # Words alignment
         word_aligner = RXWordAligner()
-        word_aligner = stream.BufferizeEndpoints({"source": stream.DIR_SOURCE})(word_aligner)
+        #word_aligner = stream.BufferizeEndpoints({"source": stream.DIR_SOURCE})(word_aligner)
         self.submodules.word_aligner = word_aligner
 
         # Flow
-        self.comb += [
-            self.sink.connect(converter.sink),
-            converter.source.connect(cdc.sink),
-            cdc.source.connect(skip_remover.sink),
-            skip_remover.source.connect(word_aligner.sink),
-            word_aligner.source.connect(self.source),
-        ]
+        self.submodules += stream.Pipeline(
+            self.sink,
+            converter,
+            cdc,
+            skip_remover,
+            word_aligner,
+            self.source
+        )
 
 # Xilinx Kintex7 USB3 Serializer/Deserializer ------------------------------------------------------
 

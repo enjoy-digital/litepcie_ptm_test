@@ -210,30 +210,41 @@ class BaseSoC(SoCMini):
             )
 
         if with_pcie_gtp_analyzer:
+            # Debug Clk Domain.
             self.cd_debug = ClockDomain()
             self.comb += self.cd_debug.clk.eq(self.pcie_phy.debug_clk)
 
+            # TX/RX Data Observation + Descrambling.
             from gateware.serdes import RXDatapath
             from gateware.scrambling import Descrambler
             self.rx_datapath    = ClockDomainsRenamer("debug")(RXDatapath(phy_dw=16))
             self.rx_descrambler = ClockDomainsRenamer("debug")(Descrambler())
+            self.tx_datapath    = ClockDomainsRenamer("debug")(RXDatapath(phy_dw=16))
+            self.tx_descrambler = ClockDomainsRenamer("debug")(Descrambler())
             self.comb += [
+                # RX.
                 self.rx_datapath.sink.valid.eq(1),
                 self.rx_datapath.sink.data.eq(self.pcie_phy.debug_rx_data),
                 self.rx_datapath.sink.ctrl.eq(self.pcie_phy.debug_rx_ctl),
                 self.rx_datapath.source.connect(self.rx_descrambler.sink),
                 self.rx_descrambler.source.ready.eq(1),
+                # TX.
+                self.tx_datapath.sink.valid.eq(1),
+                self.tx_datapath.sink.data.eq(self.pcie_phy.debug_tx_data),
+                self.tx_datapath.sink.ctrl.eq(self.pcie_phy.debug_tx_ctl),
+                self.tx_datapath.source.connect(self.tx_descrambler.sink),
+                self.tx_descrambler.source.ready.eq(1),
             ]
 
             # Analyzer
             analyzer_signals = [
-                self.pcie_phy.debug_rx_data,
-                self.pcie_phy.debug_rx_ctl,
-                #self.rx_datapath.source,
+                self.ptm_core.fsm,
+                self.ptm_core.req_timer.done,
                 self.rx_descrambler.source,
+                self.tx_descrambler.source,
             ]
             self.analyzer = LiteScopeAnalyzer(analyzer_signals,
-                depth        = 4096,
+                depth        = 8192,
                 register     = True,
                 clock_domain = "debug",
                 csr_csv      = "analyzer.csv"

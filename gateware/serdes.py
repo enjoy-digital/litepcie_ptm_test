@@ -294,14 +294,14 @@ class RXDatapath(Module):
     """
     def __init__(self, clock_domain="sys", phy_dw=16):
         self.sink   = stream.Endpoint([("data", phy_dw), ("ctrl", phy_dw//8)])
-        self.source = stream.Endpoint([("data", 32), ("ctrl", 4)])
+        self.source = stream.Endpoint([("data",     32), ("ctrl",         4)])
 
         # # #
 
         # Data-width adaptation
         converter = stream.StrideConverter(
             [("data", phy_dw), ("ctrl", phy_dw//8)],
-            [("data", 32), ("ctrl", 4)],
+            [("data",     32), ("ctrl",         4)],
             reverse=False)
         converter = stream.BufferizeEndpoints({"sink":   stream.DIR_SINK})(converter)
         converter = ClockDomainsRenamer(clock_domain)(converter)
@@ -313,8 +313,8 @@ class RXDatapath(Module):
         self.submodules.cdc = cdc
 
         # Clock compensation
-        skip_remover = RXSKPRemover()
-        self.submodules.skip_remover = skip_remover
+        #skip_remover = RXSKPRemover()
+        #self.submodules.skip_remover = skip_remover
 
         # Words alignment
         word_aligner = RXWordAligner()
@@ -325,8 +325,9 @@ class RXDatapath(Module):
         self.comb += [
             self.sink.connect(converter.sink),
             converter.source.connect(cdc.sink),
-            cdc.source.connect(skip_remover.sink),
-            skip_remover.source.connect(word_aligner.sink),
+            cdc.source.connect(word_aligner.sink),
+            #cdc.source.connect(skip_remover.sink),
+            #skip_remover.source.connect(word_aligner.sink),
             word_aligner.source.connect(self.source),
         ]
 

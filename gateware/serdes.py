@@ -313,8 +313,8 @@ class RXDatapath(Module):
         self.submodules.cdc = cdc
 
         # Clock compensation
-        #skip_remover = RXSKPRemover()
-        #self.submodules.skip_remover = skip_remover
+        skip_remover = RXSKPRemover()
+        self.submodules.skip_remover = skip_remover
 
         # Words alignment
         word_aligner = RXWordAligner()
@@ -325,9 +325,8 @@ class RXDatapath(Module):
         self.comb += [
             self.sink.connect(converter.sink),
             converter.source.connect(cdc.sink),
-            cdc.source.connect(word_aligner.sink),
-            #cdc.source.connect(skip_remover.sink),
-            #skip_remover.source.connect(word_aligner.sink),
+            cdc.source.connect(skip_remover.sink),
+            skip_remover.source.connect(word_aligner.sink),
             word_aligner.source.connect(self.source),
         ]
 

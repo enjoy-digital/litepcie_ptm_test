@@ -243,12 +243,25 @@ class BaseSoC(SoCMini):
                 self.tx_descrambler.source.ready.eq(1),
             ]
 
-            from gateware.ptm import PTMTLPAligner
+            from gateware.ptm import PTMTLPAligner, PTMTLP2AXI
+            from litepcie.tlp.depacketizer import LitePCIeTLPDepacketizer
 
             self.ptm_tlp_aligner = ClockDomainsRenamer("debug")(PTMTLPAligner())
+            self.ptm_tlp2axi     = ClockDomainsRenamer("debug")(PTMTLP2AXI())
+            self.depacketizer    = ClockDomainsRenamer("debug")(LitePCIeTLPDepacketizer(
+                data_width   = 64,
+                endianness   = "big",
+                address_mask = 0,
+                capabilities = ["REQUEST", "COMPLETION", "CONFIGURATION", "PTM"],
+            ))
             self.comb += [
                 self.rx_descrambler.source.connect(self.ptm_tlp_aligner.sink),
-                self.ptm_tlp_aligner.source.ready.eq(1),
+                self.ptm_tlp_aligner.source.connect(self.ptm_tlp2axi.sink),
+                self.ptm_tlp2axi.source.connect(self.depacketizer.sink),
+                self.depacketizer.req_source.ready.eq(1),
+                self.depacketizer.cmp_source.ready.eq(1),
+                self.depacketizer.conf_source.ready.eq(1),
+                self.depacketizer.ptm_source.ready.eq(1),
             ]
 
             # Analyzer
@@ -256,9 +269,9 @@ class BaseSoC(SoCMini):
                 self.ptm_core.fsm,
                 self.ptm_core.req_timer.done,
                 #self.ptm_tlp_aligner.sink,
-                self.ptm_tlp_aligner.fsm,
-                self.ptm_tlp_aligner.sink,
-                self.ptm_tlp_aligner.source,
+                #self.ptm_tlp_aligner.fsm,
+                #self.ptm_tlp_aligner.sink,
+                #self.ptm_tlp_aligner.source,
                 #self.tx_descrambler.source,
                 #self.rx_datapath.skip_remover.skip,
                 #self.tx_datapath.skip_remover.skip,
@@ -269,6 +282,10 @@ class BaseSoC(SoCMini):
                 #self.ptm_sniffer_injector.sink.valid,
                 #self.ptm_sniffer_injector.sink.ready,
                 #self.ptm_sniffer_injector.source,
+                self.depacketizer.ptm_source.valid,
+                self.depacketizer.ptm_source.ready,
+                self.depacketizer.ptm_source.message_code,
+                self.depacketizer.ptm_source.length,
             ]
             self.analyzer = LiteScopeAnalyzer(analyzer_signals,
                 depth        = 4096,

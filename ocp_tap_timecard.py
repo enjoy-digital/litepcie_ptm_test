@@ -243,21 +243,22 @@ class BaseSoC(SoCMini):
                 self.tx_descrambler.source.ready.eq(1),
             ]
 
-            from gateware.ptm import TLPWordAligner, PTMResponseSnifferInjector
+            from gateware.ptm import PTMTLPAligner
 
-            self.tlp_aligner          = TLPWordAligner()
-            self.ptm_sniffer_injector = PTMResponseSnifferInjector()
+            self.ptm_tlp_aligner = ClockDomainsRenamer("debug")(PTMTLPAligner())
             self.comb += [
-                self.rx_descrambler.source.connect(self.tlp_aligner.sink),
-                self.tlp_aligner.source.connect(self.ptm_sniffer_injector.sink),
-                self.ptm_sniffer_injector.source.ready.eq(1),
+                self.rx_descrambler.source.connect(self.ptm_tlp_aligner.sink),
+                self.ptm_tlp_aligner.source.ready.eq(1),
             ]
 
             # Analyzer
             analyzer_signals = [
                 self.ptm_core.fsm,
                 self.ptm_core.req_timer.done,
-                self.tlp_aligner.source,
+                #self.ptm_tlp_aligner.sink,
+                self.ptm_tlp_aligner.fsm,
+                self.ptm_tlp_aligner.sink,
+                self.ptm_tlp_aligner.source,
                 #self.tx_descrambler.source,
                 #self.rx_datapath.skip_remover.skip,
                 #self.tx_datapath.skip_remover.skip,
@@ -265,12 +266,12 @@ class BaseSoC(SoCMini):
                 #self.pcie_phy.debug_rx_ctl,
                 #self.pcie_phy.debug_tx_data,
                 #self.pcie_phy.debug_tx_ctl,
-                self.ptm_sniffer_injector.sink.valid,
-                self.ptm_sniffer_injector.sink.ready,
-                self.ptm_sniffer_injector.source,
+                #self.ptm_sniffer_injector.sink.valid,
+                #self.ptm_sniffer_injector.sink.ready,
+                #self.ptm_sniffer_injector.source,
             ]
             self.analyzer = LiteScopeAnalyzer(analyzer_signals,
-                depth        = 8192,
+                depth        = 4096,
                 register     = True,
                 samplerate   = 125e6,
                 clock_domain = "debug",

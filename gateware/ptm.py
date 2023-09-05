@@ -15,6 +15,8 @@ from litex.soc.interconnect import stream
 
 from gateware.common import *
 
+from litepcie.common import phy_layout
+
 # PTM Capabilities Constants -----------------------------------------------------------------------
 
 PTM_STRUCTURE_REGS = 3
@@ -269,8 +271,86 @@ class PTMTLPAligner(LiteXModule):
                     ],
                 }),
             ),
-            If(sink.ctrl != 0b0000,
-                source.last.eq(1),
+            If(sink.valid,
+                If(sink_ctrl_dd[0] & (sink_data_dd[0*8:1*8] == 0xfd),
+                   source.last.eq(1),
+                   NextState("IDLE")
+                ),
+                If(sink_ctrl_dd[1] & (sink_data_dd[1*8:2*8] == 0xfd),
+                   source.last.eq(1),
+                   NextState("IDLE")
+                ),
+                If(sink_ctrl_dd[2] & (sink_data_dd[2*8:3*8] == 0xfd),
+                   source.last.eq(1),
+                   NextState("IDLE")
+                ),
+                If(sink_ctrl_dd[3] & (sink_data_dd[3*8:4*8] == 0xfd),
+                   source.last.eq(1),
+                   NextState("IDLE")
+                )
+            ),
+        )
+
+# PTM TLP to AXI -----------------------------------------------------------------------------------
+
+class PTMTLP2AXI(LiteXModule):
+    def __init__(self):
+        self.sink   = sink   = stream.Endpoint([("data", 32), ("ctrl", 4)])
+        self.source = source = stream.Endpoint(phy_layout(64))
+
+        # # #
+
+        self.conv = conv = stream.StrideConverter(
+            description_from = phy_layout(32),
+            description_to   = phy_layout(64),
+            reverse          = False
+        )
+        self.comb += conv.source.connect(self.source)
+
+        self.comb += sink.ready.eq(1)
+
+        count = Signal(32)
+
+        self.fsm = fsm = FSM(reset_state="IDLE")
+        fsm.act("IDLE",
+            If(sink.valid,
+                # 3 DWs + 32-bit Data.
+                If(sink.data[0:8] == 0x34,
+                    conv.sink.valid.eq(1),
+                    conv.sink.dat.eq(reverse_bytes(sink.data)),
+                    conv.sink.be.eq(0b1111),
+                    NextValue(count, 3 - 1),
+                    NextState("RECEIVE")
+                # 4 DWs + 32-bit Data.
+                ).Elif(sink.data[0:8] == 0x74,
+                    conv.sink.valid.eq(1),
+                    conv.sink.dat.eq(reverse_bytes(sink.data)),
+                    conv.sink.be.eq(0b1111),
+                    NextValue(count, 4 - 1),
+                    NextState("RECEIVE")
+                ).Else(
+                    NextState("END")
+                )
+            )
+        )
+        fsm.act("RECEIVE",
+            If(sink.valid,
+                conv.sink.valid.eq(1),
+                conv.sink.dat.eq(reverse_bytes(sink.data)),
+                conv.sink.be.eq(0b1111),
+                NextValue(count, count - 1),
+                If(count == 0,
+                    conv.sink.last.eq(1),
+                    NextState("END")
+                ),
+                If(sink.last,
+                    conv.sink.last.eq(1),
+                    NextState("IDLE")
+                )
+            )
+        )
+        fsm.act("END",
+            If(sink.valid & sink.last,
                 NextState("IDLE")
             )
         )

@@ -9,7 +9,9 @@ from litex.soc.interconnect import stream
 
 from dumps.dump_ptm_response001 import *
 
-from gateware.ptm import PTMTLPAligner
+from gateware.ptm import PTMTLPAligner, PTMTLP2AXI
+
+from litepcie.tlp.depacketizer import LitePCIeTLPDepacketizer
 
 def data_generator(dut, length=4096-1024):
     valid = dump["ptmtlpaligner_sink_valid"][:length:2]
@@ -29,9 +31,21 @@ class DUT(LiteXModule):
         # # #
 
         self.ptm_tlp_aligner = PTMTLPAligner()
+        self.ptm_tlp2axi     = PTMTLP2AXI()
+        self.depacketizer    = LitePCIeTLPDepacketizer(
+            data_width   = 64,
+            endianness   = "big",
+            address_mask = 0,
+            capabilities = ["REQUEST", "COMPLETION", "CONFIGURATION", "PTM"],
+        )
         self.comb += [
             self.sink.connect(self.ptm_tlp_aligner.sink),
-            self.ptm_tlp_aligner.source.ready.eq(1),
+            self.ptm_tlp_aligner.source.connect(self.ptm_tlp2axi.sink),
+            self.ptm_tlp2axi.source.connect(self.depacketizer.sink),
+            self.depacketizer.req_source.ready.eq(1),
+            self.depacketizer.cmp_source.ready.eq(1),
+            self.depacketizer.conf_source.ready.eq(1),
+            self.depacketizer.ptm_source.ready.eq(1),
         ]
 
 class TestPTMTLP(unittest.TestCase):

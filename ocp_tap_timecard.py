@@ -240,14 +240,14 @@ class BaseSoC(SoCMini):
             analyzer_signals = [
                 self.ptm_core.fsm,
                 self.ptm_core.req_timer.done,
-                #self.rx_descrambler.source,
-                #self.tx_descrambler.source,
+                self.rx_descrambler.source,
+                self.tx_descrambler.source,
                 #self.rx_datapath.skip_remover.skip,
                 #self.tx_datapath.skip_remover.skip,
-                self.pcie_phy.debug_rx_data,
-                self.pcie_phy.debug_rx_ctl,
-                self.pcie_phy.debug_tx_data,
-                self.pcie_phy.debug_tx_ctl,
+                #self.pcie_phy.debug_rx_data,
+                #self.pcie_phy.debug_rx_ctl,
+                #self.pcie_phy.debug_tx_data,
+                #self.pcie_phy.debug_tx_ctl,
             ]
             self.analyzer = LiteScopeAnalyzer(analyzer_signals,
                 depth        = 8192,
@@ -255,6 +255,11 @@ class BaseSoC(SoCMini):
                 clock_domain = "debug",
                 csr_csv      = "analyzer.csv"
             )
+
+        from gateware.common import symbols
+        for symbol in symbols:
+            print(f"{symbol.name} : 0x{symbol.value:02x}")
+        exit()
 
 # Build --------------------------------------------------------------------------------------------
 

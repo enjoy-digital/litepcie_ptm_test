@@ -107,6 +107,7 @@ class RXWordAligner(Module):
 
         # # #
 
+        update      = Signal()
         alignment   = Signal(2)
         alignment_d = Signal(2)
 
@@ -123,18 +124,17 @@ class RXWordAligner(Module):
             self.comb += [
                 If(sink.valid & sink.ready,
                     If(sink.ctrl[i] & (check_ctrl_only | (sink.data[8*i:8*(i+1)] == COM.value)),
+                        update.eq(1),
                         alignment.eq(i)
                     )
                 )
             ]
         self.sync += [
             If(sink.valid & sink.ready,
-                If(self.enable,
-                    If((sink.ctrl != 0) & (buf.source.ctrl == 0),
-                        alignment_d.eq(alignment),
-                    )
+                If(self.enable & update,
+                    alignment_d.eq(alignment)
                 )
-            ),
+            )
         ]
 
         # Data selection
@@ -144,7 +144,7 @@ class RXWordAligner(Module):
         for i in range(4):
             cases[i] = [
                 source.data.eq(data[8*i:]),
-                source.ctrl.eq(ctrl[i:]),
+                source.ctrl.eq(ctrl[1*i:]),
             ]
         self.comb += If(source.valid, Case(alignment_d, cases))
 
@@ -325,14 +325,14 @@ class RXDatapath(Module):
         self.submodules.word_aligner = word_aligner
 
         # Flow
+        self.comb += self.sink.connect(converter.sink)
         self.submodules += stream.Pipeline(
-            self.sink,
             converter,
             cdc,
             skip_remover,
             word_aligner,
-            self.source
         )
+        self.comb += word_aligner.source.connect(self.source)
 
 # Xilinx Kintex7 USB3 Serializer/Deserializer ------------------------------------------------------
 

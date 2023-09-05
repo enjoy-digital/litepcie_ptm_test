@@ -181,7 +181,6 @@ class PTMTLPAligner(LiteXModule):
 
         # # #
 
-        count        = Signal(8)
         alignment    = Signal(2)
         sink_ctrl_d  = Signal(4)
         sink_ctrl_dd = Signal(4)
@@ -218,7 +217,6 @@ class PTMTLPAligner(LiteXModule):
                    NextState("RECEIVE-0")
                 )
             ),
-            NextValue(count, 0),
         )
         fsm.act("RECEIVE-0",
             If(sink.valid,
@@ -270,9 +268,9 @@ class PTMTLPAligner(LiteXModule):
                         source.ctrl[3].eq(sink.ctrl  [1]),
                     ],
                 }),
-                NextValue(count, count + 1),
-                If(count == 5,
-                    NextState("IDLE")
-                )
+            ),
+            If(sink.ctrl != 0b0000,
+                source.last.eq(1),
+                NextState("IDLE")
             )
         )

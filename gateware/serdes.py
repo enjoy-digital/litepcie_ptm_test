@@ -308,11 +308,8 @@ class RXDatapath(Module):
         self.submodules.converter = converter
 
         # Clock domain crossing
-        if clock_domain != "sys":
-            cdc = stream.AsyncFIFO([("data", 32), ("ctrl", 4)], 8, buffered=True)
-            cdc = ClockDomainsRenamer({"write": clock_domain, "read": "sys"})(cdc)
-        else:
-            cdc = stream.Buffer([("data", 32), ("ctrl", 4)])
+        cdc = stream.AsyncFIFO([("data", 32), ("ctrl", 4)], 8, buffered=True)
+        cdc = ClockDomainsRenamer({"write": clock_domain, "read": "sys"})(cdc)
         self.submodules.cdc = cdc
 
         # Clock compensation
@@ -321,18 +318,18 @@ class RXDatapath(Module):
 
         # Words alignment
         word_aligner = RXWordAligner()
-        #word_aligner = stream.BufferizeEndpoints({"source": stream.DIR_SOURCE})(word_aligner)
+        word_aligner = stream.BufferizeEndpoints({"source": stream.DIR_SOURCE})(word_aligner)
         self.submodules.word_aligner = word_aligner
 
         # Flow
-        self.comb += self.sink.connect(converter.sink)
         self.submodules += stream.Pipeline(
+            self.sink,
             converter,
             cdc,
             skip_remover,
             word_aligner,
+            self.source,
         )
-        self.comb += word_aligner.source.connect(self.source)
 
 # Xilinx Kintex7 USB3 Serializer/Deserializer ------------------------------------------------------
 

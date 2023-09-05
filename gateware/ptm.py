@@ -11,6 +11,10 @@ from migen import *
 from litex.gen import *
 from litex.gen.genlib.misc import WaitTimer
 
+from litex.soc.interconnect import stream
+
+from gateware.common import *
+
 # PTM Capabilities Constants -----------------------------------------------------------------------
 
 PTM_STRUCTURE_REGS = 3
@@ -164,6 +168,109 @@ class PTMCore(LiteXModule):
             req_ep.requester_id.eq(pcie_endpoint.phy.id),
             req_ep.message_code.eq(PTM_REQUEST_MESSAGE_CODE),
             If(req_ep.ready,
+                NextState("IDLE")
+            )
+        )
+
+# PTM Response Sniffer/Injector --------------------------------------------------------------------
+
+class TLPWordAligner(LiteXModule):
+    """RX Word Aligner
+
+    Align RX Words by analyzing the location of the COM/K-codes (configurable) in the RX stream.
+    """
+    def __init__(self, check_ctrl_only=False):
+        self.enable = Signal(reset=1)
+        self.sink   = sink   = stream.Endpoint([("data", 32), ("ctrl", 4)])
+        self.source = source = stream.Endpoint([("data", 32), ("ctrl", 4)])
+
+        # # #
+
+        update      = Signal()
+        alignment   = Signal(2)
+        alignment_d = Signal(2)
+
+        buf = stream.Buffer([("data", 32), ("ctrl", 4)])
+        self.submodules += buf
+        self.comb += [
+            sink.connect(buf.sink),
+            source.valid.eq(sink.valid & buf.source.valid),
+            buf.source.ready.eq(sink.valid & source.ready),
+        ]
+
+        # Alignment detection
+        for i in reversed(range(4)):
+            self.comb += [
+                If(sink.valid & sink.ready,
+                    If(sink.ctrl[i] & (check_ctrl_only | (sink.data[8*i:8*(i+1)] == SHP.value)),
+                        update.eq(1),
+                        alignment.eq(i)
+                    )
+                )
+            ]
+        self.sync += [
+            If(sink.valid & sink.ready,
+                If(self.enable & update,
+                    alignment_d.eq(alignment)
+                )
+            )
+        ]
+
+        # Data selection
+        data = Cat(buf.source.data, sink.data)
+        ctrl = Cat(buf.source.ctrl, sink.ctrl)
+        cases = {}
+        for i in range(4):
+            cases[i] = [
+                source.data.eq(data[8*i:]),
+                source.ctrl.eq(ctrl[1*i:]),
+            ]
+        self.comb += If(source.valid, Case(alignment_d, cases))
+
+
+class PTMResponseSnifferInjector(LiteXModule):
+    def __init__(self):
+        self.sink   = sink   = stream.Endpoint([("data", 32), ("ctrl", 4)])
+        self.source = source = stream.Endpoint([("data", 32)])
+
+        # # #
+
+        data_count = Signal(8)
+        data_last  = Signal(32)
+
+        # PTM Response Sniffer.
+        self.fsm = fsm = FSM(reset_state="IDLE")
+        fsm.act("IDLE",
+            sink.ready.eq(1),
+            If((sink.valid &
+               (sink.data[0*8:1*8] == 0xfb) & (sink.ctrl[0] == 1) &
+                                              (sink.ctrl[1] == 0) &
+                                              (sink.ctrl[2] == 0) &
+               (sink.data[3*8:4*8] == 0x74) & (sink.ctrl[3] == 0)),
+                NextValue(data_last, sink.data),
+                NextValue(data_count, 0),
+                NextState("RECEIVE")
+            )
+        )
+        fsm.act("RECEIVE",
+            sink.ready.eq(1),
+            If(sink.valid,
+                source.valid.eq(1),
+                source.data[8*0:8*1].eq(data_last[24:32]),
+                source.data[8*1:8*2].eq(sink.data[8*0:8*1]),
+                source.data[8*2:8*3].eq(sink.data[8*1:8*2]),
+                source.data[8*3:8*4].eq(sink.data[8*2:8*3]),
+                NextValue(data_last, sink.data),
+                NextValue(data_count, data_count + 1),
+                If(data_count == 4,
+                    NextState("CRC")
+
+                )
+            )
+        )
+        fsm.act("CRC",
+            sink.ready.eq(1),
+            If(sink.valid,
                 NextState("IDLE")
             )
         )

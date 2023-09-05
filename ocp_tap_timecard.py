@@ -34,6 +34,7 @@ import os
 from migen import *
 
 from litex.gen import *
+from litex.gen.genlib.misc import WaitTimer
 
 import ocp_tap_timecard_platform as ocp_tap_timecard
 
@@ -214,6 +215,10 @@ class BaseSoC(SoCMini):
             self.cd_debug = ClockDomain()
             self.comb += self.cd_debug.clk.eq(self.pcie_phy.debug_clk)
 
+            self.align_timer = WaitTimer(sys_clk_freq)
+            self.comb += self.align_timer.wait.eq(1)
+
+
             # TX/RX Data Observation + Descrambling.
             from gateware.serdes import RXDatapath
             from gateware.scrambling import Descrambler
@@ -222,12 +227,14 @@ class BaseSoC(SoCMini):
             self.tx_datapath    = ClockDomainsRenamer("debug")(RXDatapath(phy_dw=16))
             self.tx_descrambler = ClockDomainsRenamer("debug")(Descrambler())
             self.comb += [
+                #self.rx_datapath.word_aligner.enable.eq(~self.align_timer.done),
+                #self.tx_datapath.word_aligner.enable.eq(~self.align_timer.done),
                 # RX.
                 self.rx_datapath.sink.valid.eq(1),
                 self.rx_datapath.sink.data.eq(self.pcie_phy.debug_rx_data),
                 self.rx_datapath.sink.ctrl.eq(self.pcie_phy.debug_rx_ctl),
                 self.rx_datapath.source.connect(self.rx_descrambler.sink),
-                self.rx_descrambler.source.ready.eq(1),
+                #self.rx_descrambler.source.ready.eq(1),
                 # TX.
                 self.tx_datapath.sink.valid.eq(1),
                 self.tx_datapath.sink.data.eq(self.pcie_phy.debug_tx_data),
@@ -236,22 +243,36 @@ class BaseSoC(SoCMini):
                 self.tx_descrambler.source.ready.eq(1),
             ]
 
+            from gateware.ptm import TLPWordAligner, PTMResponseSnifferInjector
+
+            self.tlp_aligner          = TLPWordAligner()
+            self.ptm_sniffer_injector = PTMResponseSnifferInjector()
+            self.comb += [
+                self.rx_descrambler.source.connect(self.tlp_aligner.sink),
+                self.tlp_aligner.source.connect(self.ptm_sniffer_injector.sink),
+                self.ptm_sniffer_injector.source.ready.eq(1),
+            ]
+
             # Analyzer
             analyzer_signals = [
                 self.ptm_core.fsm,
                 self.ptm_core.req_timer.done,
-                self.rx_descrambler.source,
-                self.tx_descrambler.source,
+                self.tlp_aligner.source,
+                #self.tx_descrambler.source,
                 #self.rx_datapath.skip_remover.skip,
                 #self.tx_datapath.skip_remover.skip,
                 #self.pcie_phy.debug_rx_data,
                 #self.pcie_phy.debug_rx_ctl,
                 #self.pcie_phy.debug_tx_data,
                 #self.pcie_phy.debug_tx_ctl,
+                self.ptm_sniffer_injector.sink.valid,
+                self.ptm_sniffer_injector.sink.ready,
+                self.ptm_sniffer_injector.source,
             ]
             self.analyzer = LiteScopeAnalyzer(analyzer_signals,
                 depth        = 8192,
                 register     = True,
+                samplerate   = 125e6,
                 clock_domain = "debug",
                 csr_csv      = "analyzer.csv"
             )
@@ -259,7 +280,7 @@ class BaseSoC(SoCMini):
         from gateware.common import symbols
         for symbol in symbols:
             print(f"{symbol.name} : 0x{symbol.value:02x}")
-        exit()
+        #exit()
 
 # Build --------------------------------------------------------------------------------------------
 

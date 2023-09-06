@@ -9,7 +9,7 @@ from litex.soc.interconnect import stream
 
 from test.dumps.dump003 import *
 
-from gateware.serdes import RXDatapath
+from gateware.sniffer import RXDatapath
 from gateware.scrambling import Descrambler
 
 def rx_data_generator(dut, length=8192-1024):

@@ -220,7 +220,7 @@ class BaseSoC(SoCMini):
 
 
             # TX/RX Data Observation + Descrambling.
-            from gateware.serdes import RXDatapath
+            from gateware.sniffer import RXDatapath
             from gateware.scrambling import Descrambler
             self.rx_datapath    = ClockDomainsRenamer("debug")(RXDatapath(phy_dw=16))
             self.rx_descrambler = ClockDomainsRenamer("debug")(Descrambler())

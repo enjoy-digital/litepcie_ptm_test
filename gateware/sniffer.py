@@ -13,7 +13,7 @@ from litex.soc.interconnect import stream
 
 from litepcie.common import phy_layout
 
-from gateware.common import K, COM, SKP
+from gateware.common import COM, EndiannessSwap
 
 # Raw Word Aligner ---------------------------------------------------------------------------------
 
@@ -79,6 +79,7 @@ class RawDatapath(LiteXModule):
     - Data-width adaptation (from transceiver's data-width to 32-bit).
     - Clock domain crossing (from transceiver's RX clock to system clock).
     - Words alignment.
+
     """
     def __init__(self, clock_domain="sys", phy_dw=16):
         self.sink   = stream.Endpoint([("data", phy_dw), ("ctrl", phy_dw//8)])
@@ -231,6 +232,18 @@ class TLPAligner(LiteXModule):
             ),
         )
 
+
+# TLP Endianness Swap ------------------------------------------------------------------------------
+
+class TLPEndiannessSwap(LiteXModule):
+    def __init__(self):
+        self.sink   = sink   = stream.Endpoint([("data", 32), ("ctrl", 4)])
+        self.source = source = stream.Endpoint([("data", 32), ("ctrl", 4)])
+
+        # # #
+
+        self.submodules += EndiannessSwap(sink, source)
+
 # TLP Filter/Formater ------------------------------------------------------------------------------
 
 class TLPFilterFormater(LiteXModule):
@@ -265,16 +278,16 @@ class TLPFilterFormater(LiteXModule):
         fsm.act("IDLE",
             If(sink.valid,
                 # 3 DWs + 32-bit Data.
-                If(sink.data[0:8] == 0x34,
+                If(sink.data[24:32] == 0x34,
                     fifo.sink.valid.eq(1),
-                    fifo.sink.dat.eq(reverse_bytes(sink.data)),
+                    fifo.sink.dat.eq(sink.data),
                     fifo.sink.be.eq(0b1111),
                     NextValue(count, 3 - 1),
                     NextState("RECEIVE")
                 # 4 DWs + 32-bit Data.
-                ).Elif(sink.data[0:8] == 0x74,
+                ).Elif(sink.data[24:32] == 0x74,
                     fifo.sink.valid.eq(1),
-                    fifo.sink.dat.eq(reverse_bytes(sink.data)),
+                    fifo.sink.dat.eq(sink.data),
                     fifo.sink.be.eq(0b1111),
                     NextValue(count, 4 - 1),
                     NextState("RECEIVE")
@@ -286,7 +299,7 @@ class TLPFilterFormater(LiteXModule):
         fsm.act("RECEIVE",
             If(sink.valid,
                 fifo.sink.valid.eq(1),
-                fifo.sink.dat.eq(reverse_bytes(sink.data)),
+                fifo.sink.dat.eq(sink.data),
                 fifo.sink.be.eq(0b1111),
                 NextValue(count, count - 1),
                 If(count == 0,

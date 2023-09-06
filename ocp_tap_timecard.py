@@ -243,25 +243,30 @@ class BaseSoC(SoCMini):
                 self.tx_descrambler.source.ready.eq(1),
             ]
 
-            from gateware.sniffer import TLPAligner, TLPFilterFormater
+            from gateware.sniffer import TLPAligner, TLPEndiannessSwap, TLPFilterFormater
             from litepcie.tlp.depacketizer import LitePCIeTLPDepacketizer
 
             self.tlp_aligner         = ClockDomainsRenamer("debug")(TLPAligner())
+            self.tlp_endianness_swap = ClockDomainsRenamer("debug")(TLPEndiannessSwap())
             self.tlp_filter_formater = ClockDomainsRenamer("debug")(TLPFilterFormater())
-            self.depacketizer        = ClockDomainsRenamer("debug")(LitePCIeTLPDepacketizer(
+            self.tlp_depacketizer    = ClockDomainsRenamer("debug")(LitePCIeTLPDepacketizer(
                 data_width   = 64,
                 endianness   = "big",
                 address_mask = 0,
                 capabilities = ["REQUEST", "COMPLETION", "CONFIGURATION", "PTM"],
             ))
+            self.submodules += stream.Pipeline(
+                self.rx_descrambler,
+                self.tlp_aligner,
+                self.tlp_endianness_swap,
+                self.tlp_filter_formater,
+                self.tlp_depacketizer,
+            )
             self.comb += [
-                self.rx_descrambler.source.connect(self.tlp_aligner.sink),
-                self.tlp_aligner.source.connect(self.tlp_filter_formater.sink),
-                self.tlp_filter_formater.source.connect(self.depacketizer.sink),
-                self.depacketizer.req_source.ready.eq(1),
-                self.depacketizer.cmp_source.ready.eq(1),
-                self.depacketizer.conf_source.ready.eq(1),
-                self.depacketizer.ptm_source.ready.eq(1),
+                self.tlp_depacketizer.req_source.ready.eq(1),
+                self.tlp_depacketizer.cmp_source.ready.eq(1),
+                self.tlp_depacketizer.conf_source.ready.eq(1),
+                self.tlp_depacketizer.ptm_source.ready.eq(1),
             ]
 
             # Analyzer
@@ -271,7 +276,7 @@ class BaseSoC(SoCMini):
                 #self.tlp_aligner.sink,
                 #self.tlp_aligner.fsm,
                 #self.tlp_aligner.sink,
-                #self.tlp_aligner.source,
+                self.tlp_aligner.source,
                 #self.tx_descrambler.source,
                 #self.rx_datapath.skip_remover.skip,
                 #self.tx_datapath.skip_remover.skip,
@@ -282,13 +287,13 @@ class BaseSoC(SoCMini):
                 #self.ptm_sniffer_injector.sink.valid,
                 #self.ptm_sniffer_injector.sink.ready,
                 #self.ptm_sniffer_injector.source,
-                self.depacketizer.ptm_source.valid,
-                self.depacketizer.ptm_source.ready,
-                self.depacketizer.ptm_source.message_code,
-                self.depacketizer.ptm_source.length,
+                self.tlp_depacketizer.ptm_source.valid,
+                self.tlp_depacketizer.ptm_source.ready,
+                #self.depacketizer.ptm_source.message_code,
+                #self.depacketizer.ptm_source.length,
             ]
             self.analyzer = LiteScopeAnalyzer(analyzer_signals,
-                depth        = 4096,
+                depth        = 8192,
                 register     = True,
                 samplerate   = 125e6,
                 clock_domain = "debug",

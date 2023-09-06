@@ -9,7 +9,7 @@ from litex.soc.interconnect import stream
 
 from test.dumps.dump_ptm_response001 import *
 
-from gateware.sniffer import TLPAligner, TLPFilterFormater
+from gateware.sniffer import TLPAligner, TLPEndiannessSwap, TLPFilterFormater
 
 from litepcie.tlp.depacketizer import LitePCIeTLPDepacketizer
 
@@ -31,6 +31,7 @@ class DUT(LiteXModule):
         # # #
 
         self.tlp_aligner         = TLPAligner()
+        self.tlp_endianness_swap = TLPEndiannessSwap()
         self.tlp_filter_formater = TLPFilterFormater()
         self.tlp_depacketizer    = LitePCIeTLPDepacketizer(
             data_width   = 64,
@@ -38,10 +39,14 @@ class DUT(LiteXModule):
             address_mask = 0,
             capabilities = ["REQUEST", "COMPLETION", "CONFIGURATION", "PTM"],
         )
+        self.submodules += stream.Pipeline(
+            self.sink,
+            self.tlp_aligner,
+            self.tlp_endianness_swap,
+            self.tlp_filter_formater,
+            self.tlp_depacketizer,
+        )
         self.comb += [
-            self.sink.connect(self.tlp_aligner.sink),
-            self.tlp_aligner.source.connect(self.tlp_filter_formater.sink),
-            self.tlp_filter_formater.source.connect(self.tlp_depacketizer.sink),
             self.tlp_depacketizer.req_source.ready.eq(1),
             self.tlp_depacketizer.cmp_source.ready.eq(1),
             self.tlp_depacketizer.conf_source.ready.eq(1),

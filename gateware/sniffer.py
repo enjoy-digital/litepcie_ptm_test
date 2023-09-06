@@ -17,12 +17,12 @@ from gateware.common import K, COM, SKP
 
 # Raw Word Aligner ---------------------------------------------------------------------------------
 
-class RawWordAligner(Module):
+class RawWordAligner(LiteXModule):
     """Raw Word Aligner
 
     Align RX Words by analyzing the location of the COM/K-codes (configurable) in the RX stream.
     """
-    def __init__(self, check_ctrl_only=False):
+    def __init__(self):
         self.enable = Signal(reset=1)
         self.sink   = sink   = stream.Endpoint([("data", 32), ("ctrl", 4)])
         self.source = source = stream.Endpoint([("data", 32), ("ctrl", 4)])
@@ -45,7 +45,7 @@ class RawWordAligner(Module):
         for i in reversed(range(4)):
             self.comb += [
                 If(sink.valid & sink.ready,
-                    If(sink.ctrl[i] & (check_ctrl_only | (sink.data[8*i:8*(i+1)] == COM.value)),
+                    If(sink.ctrl[i] & (sink.data[8*i:8*(i+1)] == COM.value),
                         update.eq(1),
                         alignment.eq(i)
                     )
@@ -72,7 +72,7 @@ class RawWordAligner(Module):
 
 # Raw Datapath -------------------------------------------------------------------------------------
 
-class RawDatapath(Module):
+class RawDatapath(LiteXModule):
     """Raw Datapath
 
     This module realizes the:
@@ -93,17 +93,17 @@ class RawDatapath(Module):
             reverse=False)
         converter = stream.BufferizeEndpoints({"sink":   stream.DIR_SINK})(converter)
         converter = ClockDomainsRenamer(clock_domain)(converter)
-        self.submodules.converter = converter
+        self.converter = converter
 
         # Clock domain crossing
         cdc = stream.AsyncFIFO([("data", 32), ("ctrl", 4)], 8, buffered=True)
         cdc = ClockDomainsRenamer({"write": clock_domain, "read": "sys"})(cdc)
-        self.submodules.cdc = cdc
+        self.cdc = cdc
 
         # Words alignment
         word_aligner = RawWordAligner()
         word_aligner = stream.BufferizeEndpoints({"source": stream.DIR_SOURCE})(word_aligner)
-        self.submodules.word_aligner = word_aligner
+        self.word_aligner = word_aligner
 
         # Flow
         self.submodules += stream.Pipeline(
@@ -240,32 +240,42 @@ class TLPFilterFormater(LiteXModule):
 
         # # #
 
+        # Signals.
+        count = Signal(32)
+
+        # Always accept incoming data.
+        self.comb += sink.ready.eq(1)
+
+        # Data-FIFO (For eventual source unavailability absorbtion).
+        self.fifo = fifo = stream.SyncFIFO(phy_layout(32), depth=64)
+
+        # Data-Width Converter: 32-bit to 64-bit.
         self.conv = conv = stream.StrideConverter(
             description_from = phy_layout(32),
             description_to   = phy_layout(64),
             reverse          = False
         )
-        self.comb += conv.source.connect(self.source)
+        self.comb += [
+            fifo.source.connect(conv.sink),
+            conv.source.connect(self.source),
+        ]
 
-        self.comb += sink.ready.eq(1)
-
-        count = Signal(32)
-
+        # FSM.
         self.fsm = fsm = FSM(reset_state="IDLE")
         fsm.act("IDLE",
             If(sink.valid,
                 # 3 DWs + 32-bit Data.
                 If(sink.data[0:8] == 0x34,
-                    conv.sink.valid.eq(1),
-                    conv.sink.dat.eq(reverse_bytes(sink.data)),
-                    conv.sink.be.eq(0b1111),
+                    fifo.sink.valid.eq(1),
+                    fifo.sink.dat.eq(reverse_bytes(sink.data)),
+                    fifo.sink.be.eq(0b1111),
                     NextValue(count, 3 - 1),
                     NextState("RECEIVE")
                 # 4 DWs + 32-bit Data.
                 ).Elif(sink.data[0:8] == 0x74,
-                    conv.sink.valid.eq(1),
-                    conv.sink.dat.eq(reverse_bytes(sink.data)),
-                    conv.sink.be.eq(0b1111),
+                    fifo.sink.valid.eq(1),
+                    fifo.sink.dat.eq(reverse_bytes(sink.data)),
+                    fifo.sink.be.eq(0b1111),
                     NextValue(count, 4 - 1),
                     NextState("RECEIVE")
                 ).Else(
@@ -275,16 +285,16 @@ class TLPFilterFormater(LiteXModule):
         )
         fsm.act("RECEIVE",
             If(sink.valid,
-                conv.sink.valid.eq(1),
-                conv.sink.dat.eq(reverse_bytes(sink.data)),
-                conv.sink.be.eq(0b1111),
+                fifo.sink.valid.eq(1),
+                fifo.sink.dat.eq(reverse_bytes(sink.data)),
+                fifo.sink.be.eq(0b1111),
                 NextValue(count, count - 1),
                 If(count == 0,
-                    conv.sink.last.eq(1),
+                    fifo.sink.last.eq(1),
                     NextState("END")
                 ),
                 If(sink.last,
-                    conv.sink.last.eq(1),
+                    fifo.sink.last.eq(1),
                     NextState("IDLE")
                 )
             )

@@ -9,7 +9,7 @@ from litex.soc.interconnect import stream
 
 from test.dumps.dump_ptm_response001 import *
 
-from gateware.sniffer import PTMTLPAligner, PTMTLP2AXI
+from gateware.sniffer import TLPAligner, TLPFilterFormater
 
 from litepcie.tlp.depacketizer import LitePCIeTLPDepacketizer
 
@@ -30,28 +30,28 @@ class DUT(LiteXModule):
 
         # # #
 
-        self.ptm_tlp_aligner = PTMTLPAligner()
-        self.ptm_tlp2axi     = PTMTLP2AXI()
-        self.depacketizer    = LitePCIeTLPDepacketizer(
+        self.tlp_aligner         = TLPAligner()
+        self.tlp_filter_formater = TLPFilterFormater()
+        self.tlp_depacketizer    = LitePCIeTLPDepacketizer(
             data_width   = 64,
             endianness   = "big",
             address_mask = 0,
             capabilities = ["REQUEST", "COMPLETION", "CONFIGURATION", "PTM"],
         )
         self.comb += [
-            self.sink.connect(self.ptm_tlp_aligner.sink),
-            self.ptm_tlp_aligner.source.connect(self.ptm_tlp2axi.sink),
-            self.ptm_tlp2axi.source.connect(self.depacketizer.sink),
-            self.depacketizer.req_source.ready.eq(1),
-            self.depacketizer.cmp_source.ready.eq(1),
-            self.depacketizer.conf_source.ready.eq(1),
-            self.depacketizer.ptm_source.ready.eq(1),
+            self.sink.connect(self.tlp_aligner.sink),
+            self.tlp_aligner.source.connect(self.tlp_filter_formater.sink),
+            self.tlp_filter_formater.source.connect(self.tlp_depacketizer.sink),
+            self.tlp_depacketizer.req_source.ready.eq(1),
+            self.tlp_depacketizer.cmp_source.ready.eq(1),
+            self.tlp_depacketizer.conf_source.ready.eq(1),
+            self.tlp_depacketizer.ptm_source.ready.eq(1),
         ]
 
-class TestPTMTLP(unittest.TestCase):
-    def test_ptm_tlp(self):
+class TestTLPSniffer(unittest.TestCase):
+    def test_tlp_sniffer(self):
         dut        = DUT()
         generators = [
             data_generator(dut),
         ]
-        run_simulation(dut, generators, vcd_name="test_ptm_tlp.vcd")
+        run_simulation(dut, generators, vcd_name="test_tlp_sniffer.vcd")

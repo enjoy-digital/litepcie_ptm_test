@@ -109,9 +109,9 @@ class Scrambler(Module):
                 )
             ]
 
-# Descrambler (Scrambler + Auto-Synchronization) (Appendix B) --------------------------------------
+# Raw Descrambler (Scrambler + Auto-Synchronization) (Appendix B) ----------------------------------
 
-class Descrambler(Module):
+class RawDescrambler(Module):
     """Descrambler
 
     This module descrambles the RX data/ctrl stream. K codes shall not be scrambled. The descrambler

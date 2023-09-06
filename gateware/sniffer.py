@@ -15,10 +15,10 @@ from litepcie.common import phy_layout
 
 from gateware.common import K, COM, SKP
 
-# RX Aligner ---------------------------------------------------------------------------------------
+# Raw Word Aligner ---------------------------------------------------------------------------------
 
-class RXWordAligner(Module):
-    """RX Word Aligner
+class RawWordAligner(Module):
+    """Raw Word Aligner
 
     Align RX Words by analyzing the location of the COM/K-codes (configurable) in the RX stream.
     """
@@ -70,10 +70,10 @@ class RXWordAligner(Module):
             ]
         self.comb += If(source.valid, Case(alignment_d, cases))
 
-# RX Datapath --------------------------------------------------------------------------------------
+# Raw Datapath -------------------------------------------------------------------------------------
 
-class RXDatapath(Module):
-    """RX Datapath
+class RawDatapath(Module):
+    """Raw Datapath
 
     This module realizes the:
     - Data-width adaptation (from transceiver's data-width to 32-bit).
@@ -101,7 +101,7 @@ class RXDatapath(Module):
         self.submodules.cdc = cdc
 
         # Words alignment
-        word_aligner = RXWordAligner()
+        word_aligner = RawWordAligner()
         word_aligner = stream.BufferizeEndpoints({"source": stream.DIR_SOURCE})(word_aligner)
         self.submodules.word_aligner = word_aligner
 
@@ -114,9 +114,9 @@ class RXDatapath(Module):
             self.source,
         )
 
-# PTM Response Sniffer/Injector --------------------------------------------------------------------
+# TLP Aligner --------------------------------------------------------------------------------------
 
-class PTMTLPAligner(LiteXModule):
+class TLPAligner(LiteXModule):
     def __init__(self):
         self.sink   = sink   = stream.Endpoint([("data", 32), ("ctrl", 4)])
         self.source = source = stream.Endpoint([("data", 32), ("ctrl", 4)])
@@ -231,9 +231,9 @@ class PTMTLPAligner(LiteXModule):
             ),
         )
 
-# PTM TLP to AXI -----------------------------------------------------------------------------------
+# TLP Filter/Formater ------------------------------------------------------------------------------
 
-class PTMTLP2AXI(LiteXModule):
+class TLPFilterFormater(LiteXModule):
     def __init__(self):
         self.sink   = sink   = stream.Endpoint([("data", 32), ("ctrl", 4)])
         self.source = source = stream.Endpoint(phy_layout(64))

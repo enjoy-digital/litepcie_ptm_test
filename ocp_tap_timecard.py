@@ -220,12 +220,12 @@ class BaseSoC(SoCMini):
 
 
             # TX/RX Data Observation + Descrambling.
-            from gateware.sniffer import RXDatapath
-            from gateware.scrambling import Descrambler
-            self.rx_datapath    = ClockDomainsRenamer("debug")(RXDatapath(phy_dw=16))
-            self.rx_descrambler = ClockDomainsRenamer("debug")(Descrambler())
-            self.tx_datapath    = ClockDomainsRenamer("debug")(RXDatapath(phy_dw=16))
-            self.tx_descrambler = ClockDomainsRenamer("debug")(Descrambler())
+            from gateware.sniffer import RawDatapath
+            from gateware.scrambling import RawDescrambler
+            self.rx_datapath    = ClockDomainsRenamer("debug")(RawDatapath(phy_dw=16))
+            self.rx_descrambler = ClockDomainsRenamer("debug")(RawDescrambler())
+            self.tx_datapath    = ClockDomainsRenamer("debug")(RawDatapath(phy_dw=16))
+            self.tx_descrambler = ClockDomainsRenamer("debug")(RawDescrambler())
             self.comb += [
                 #self.rx_datapath.word_aligner.enable.eq(~self.align_timer.done),
                 #self.tx_datapath.word_aligner.enable.eq(~self.align_timer.done),
@@ -243,21 +243,21 @@ class BaseSoC(SoCMini):
                 self.tx_descrambler.source.ready.eq(1),
             ]
 
-            from gateware.sniffer import PTMTLPAligner, PTMTLP2AXI
+            from gateware.sniffer import TLPAligner, TLPFilterFormater
             from litepcie.tlp.depacketizer import LitePCIeTLPDepacketizer
 
-            self.ptm_tlp_aligner = ClockDomainsRenamer("debug")(PTMTLPAligner())
-            self.ptm_tlp2axi     = ClockDomainsRenamer("debug")(PTMTLP2AXI())
-            self.depacketizer    = ClockDomainsRenamer("debug")(LitePCIeTLPDepacketizer(
+            self.tlp_aligner         = ClockDomainsRenamer("debug")(TLPAligner())
+            self.tlp_filter_formater = ClockDomainsRenamer("debug")(TLPFilterFormater())
+            self.depacketizer        = ClockDomainsRenamer("debug")(LitePCIeTLPDepacketizer(
                 data_width   = 64,
                 endianness   = "big",
                 address_mask = 0,
                 capabilities = ["REQUEST", "COMPLETION", "CONFIGURATION", "PTM"],
             ))
             self.comb += [
-                self.rx_descrambler.source.connect(self.ptm_tlp_aligner.sink),
-                self.ptm_tlp_aligner.source.connect(self.ptm_tlp2axi.sink),
-                self.ptm_tlp2axi.source.connect(self.depacketizer.sink),
+                self.rx_descrambler.source.connect(self.tlp_aligner.sink),
+                self.tlp_aligner.source.connect(self.tlp_filter_formater.sink),
+                self.tlp_filter_formater.source.connect(self.depacketizer.sink),
                 self.depacketizer.req_source.ready.eq(1),
                 self.depacketizer.cmp_source.ready.eq(1),
                 self.depacketizer.conf_source.ready.eq(1),
@@ -268,10 +268,10 @@ class BaseSoC(SoCMini):
             analyzer_signals = [
                 self.ptm_core.fsm,
                 self.ptm_core.req_timer.done,
-                #self.ptm_tlp_aligner.sink,
-                #self.ptm_tlp_aligner.fsm,
-                #self.ptm_tlp_aligner.sink,
-                #self.ptm_tlp_aligner.source,
+                #self.tlp_aligner.sink,
+                #self.tlp_aligner.fsm,
+                #self.tlp_aligner.sink,
+                #self.tlp_aligner.source,
                 #self.tx_descrambler.source,
                 #self.rx_datapath.skip_remover.skip,
                 #self.tx_datapath.skip_remover.skip,

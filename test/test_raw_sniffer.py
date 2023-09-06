@@ -9,8 +9,8 @@ from litex.soc.interconnect import stream
 
 from test.dumps.dump003 import *
 
-from gateware.sniffer import RXDatapath
-from gateware.scrambling import Descrambler
+from gateware.sniffer import RawDatapath
+from gateware.scrambling import RawDescrambler
 
 def rx_data_generator(dut, length=8192-1024):
     rx_data = dump["s7pciephy_debug_rx_data"][:length:2]
@@ -51,7 +51,7 @@ def tx_data_checker(dut, length=4096):
         yield
 
 
-class DecodingDUT(LiteXModule):
+class RawSnifferDUT(LiteXModule):
     def __init__(self):
         self.rx_sink   = stream.Endpoint([("data", 16), ("ctrl", 2)])
         self.rx_source = stream.Endpoint([("data", 32), ("ctrl", 4)])
@@ -62,8 +62,8 @@ class DecodingDUT(LiteXModule):
         # # #
 
         # RX.
-        self.rx_datapath    = RXDatapath(phy_dw=16)
-        self.rx_descrambler = Descrambler()
+        self.rx_datapath    = RawDatapath(phy_dw=16)
+        self.rx_descrambler = RawDescrambler()
         self.comb += [
             self.rx_datapath.sink.valid.eq(1),
             self.rx_datapath.sink.data.eq(self.rx_sink.data),
@@ -73,8 +73,8 @@ class DecodingDUT(LiteXModule):
         ]
 
         # TX.
-        self.tx_datapath    = RXDatapath(phy_dw=16)
-        self.tx_descrambler = Descrambler()
+        self.tx_datapath    = RawDatapath(phy_dw=16)
+        self.tx_descrambler = RawDescrambler()
         self.comb += [
             self.tx_datapath.sink.valid.eq(1),
             self.tx_datapath.sink.data.eq(self.tx_sink.data),
@@ -83,13 +83,13 @@ class DecodingDUT(LiteXModule):
             self.tx_descrambler.source.connect(self.tx_source),
         ]
 
-class TestDecoding(unittest.TestCase):
-    def test_decoding(self):
-        dut        = DecodingDUT()
+class TestRawSniffer(unittest.TestCase):
+    def test_raw_sniffer(self):
+        dut        = RawSnifferDUT()
         generators = [
             rx_data_generator(dut),
             tx_data_generator(dut),
             rx_data_checker(dut),
             tx_data_checker(dut),
         ]
-        run_simulation(dut, generators, vcd_name="test_decoding.vcd")
+        run_simulation(dut, generators, vcd_name="test_raw_sniffer.vcd")

@@ -1,7 +1,8 @@
 #
-# This file is part of USB3-PIPE project.
+# This file is part of LitePCIe-PTM.
 #
-# Copyright (c) 2019-2020 Florent Kermarrec <florent@enjoy-digital.fr>
+# Copyright (c) 2023 NetTimeLogic
+# Copyright (c) 2019-2023 Florent Kermarrec <florent@enjoy-digital.fr>
 # SPDX-License-Identifier: BSD-2-Clause
 
 from migen import *

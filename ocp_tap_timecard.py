@@ -211,98 +211,24 @@ class BaseSoC(SoCMini):
             )
 
         if with_pcie_gtp_analyzer:
-            # Debug Clk Domain.
-            self.cd_debug = ClockDomain()
-            self.comb += self.cd_debug.clk.eq(self.pcie_phy.debug_clk)
+            from gateware.ptm import PTMSniffer
 
-            self.align_timer = WaitTimer(sys_clk_freq)
-            self.comb += self.align_timer.wait.eq(1)
-
-
-            # TX/RX Data Observation + Descrambling.
-            from gateware.sniffer import RawDatapath
-            from gateware.scrambling import RawDescrambler
-            self.rx_datapath    = ClockDomainsRenamer("debug")(RawDatapath(phy_dw=16))
-            self.rx_descrambler = ClockDomainsRenamer("debug")(RawDescrambler())
-            self.tx_datapath    = ClockDomainsRenamer("debug")(RawDatapath(phy_dw=16))
-            self.tx_descrambler = ClockDomainsRenamer("debug")(RawDescrambler())
-            self.comb += [
-                #self.rx_datapath.word_aligner.enable.eq(~self.align_timer.done),
-                #self.tx_datapath.word_aligner.enable.eq(~self.align_timer.done),
-                # RX.
-                self.rx_datapath.sink.valid.eq(1),
-                self.rx_datapath.sink.data.eq(self.pcie_phy.debug_rx_data),
-                self.rx_datapath.sink.ctrl.eq(self.pcie_phy.debug_rx_ctl),
-                self.rx_datapath.source.connect(self.rx_descrambler.sink),
-                #self.rx_descrambler.source.ready.eq(1),
-                # TX.
-                self.tx_datapath.sink.valid.eq(1),
-                self.tx_datapath.sink.data.eq(self.pcie_phy.debug_tx_data),
-                self.tx_datapath.sink.ctrl.eq(self.pcie_phy.debug_tx_ctl),
-                self.tx_datapath.source.connect(self.tx_descrambler.sink),
-                self.tx_descrambler.source.ready.eq(1),
-            ]
-
-            from gateware.sniffer import TLPAligner, TLPEndiannessSwap, TLPFilterFormater
-            from litepcie.tlp.depacketizer import LitePCIeTLPDepacketizer
-
-            self.tlp_aligner         = ClockDomainsRenamer("debug")(TLPAligner())
-            self.tlp_endianness_swap = ClockDomainsRenamer("debug")(TLPEndiannessSwap())
-            self.tlp_filter_formater = ClockDomainsRenamer("debug")(TLPFilterFormater())
-            self.tlp_depacketizer    = ClockDomainsRenamer("debug")(LitePCIeTLPDepacketizer(
-                data_width   = 64,
-                endianness   = "big",
-                address_mask = 0,
-                capabilities = ["REQUEST", "COMPLETION", "CONFIGURATION", "PTM"],
-            ))
-            self.submodules += stream.Pipeline(
-                self.rx_descrambler,
-                self.tlp_aligner,
-                self.tlp_endianness_swap,
-                self.tlp_filter_formater,
-                self.tlp_depacketizer,
+            self.ptm_sniffer = PTMSniffer(
+                rx_clk  = self.pcie_phy.debug_clk,
+                rx_data = self.pcie_phy.debug_rx_data,
+                rx_ctrl = self.pcie_phy.debug_rx_ctl
             )
-            self.comb += [
-                self.tlp_depacketizer.req_source.ready.eq(1),
-                self.tlp_depacketizer.cmp_source.ready.eq(1),
-                self.tlp_depacketizer.conf_source.ready.eq(1),
-                self.tlp_depacketizer.ptm_source.ready.eq(1),
-            ]
-
+            self.comb += self.ptm_sniffer.source.ready.eq(1)
             # Analyzer
             analyzer_signals = [
                 self.ptm_core.fsm,
-                self.ptm_core.req_timer.done,
-                #self.tlp_aligner.sink,
-                #self.tlp_aligner.fsm,
-                #self.tlp_aligner.sink,
-                #self.rx_descrambler.source,
-                #self.tlp_aligner.source,
-                #self.tlp_filter_formater.sink,
-                #self.tlp_filter_formater.fifo.sink,
-                #self.tlp_filter_formater.source,
-                #self.tlp_filter_formater.source,
-                #self.tx_descrambler.source,
-                #self.rx_datapath.skip_remover.skip,
-                #self.tx_datapath.skip_remover.skip,
-                #self.pcie_phy.debug_rx_data,
-                #self.pcie_phy.debug_rx_ctl,
-                #self.pcie_phy.debug_tx_data,
-                #self.pcie_phy.debug_tx_ctl,
-                #self.ptm_sniffer_injector.sink.valid,
-                #self.ptm_sniffer_injector.sink.ready,
-                #self.ptm_sniffer_injector.source,
-                self.tlp_depacketizer.ptm_source.valid,
-                self.tlp_depacketizer.ptm_source.ready,
-                self.tlp_depacketizer.ptm_source.master_time,
-                #self.depacketizer.ptm_source.message_code,
-                #self.depacketizer.ptm_source.length,
+                self.ptm_sniffer.source,
             ]
             self.analyzer = LiteScopeAnalyzer(analyzer_signals,
                 depth        = 2048,
                 register     = True,
                 samplerate   = 125e6,
-                clock_domain = "debug",
+                clock_domain = "sys",
                 csr_csv      = "analyzer.csv"
             )
 

@@ -5,7 +5,6 @@
 # Copyright (c) 2023 Florent Kermarrec <florent@enjoy-digital.fr>
 # SPDX-License-Identifier: BSD-2-Clause
 
-
 from migen import *
 
 from litex.gen import *
@@ -129,6 +128,71 @@ class PTMCapabilities(LiteXModule):
             self.ptm_enable.eq(               (mem_ctrl_port.dat_r >> PTM_CONTROL_ENABLE_OFFSET)                & 0b1),
             self.ptm_root_select.eq(          (mem_ctrl_port.dat_r >> PTM_CONTROL_ROOT_SELECT_OFFSET)           & 0b1),
             self.ptm_effective_granularity.eq((mem_ctrl_port.dat_r >> PTM_CONTROL_EFFECTIVE_GRANULARITY_OFFSET) & 0b1111_1111),
+        ]
+
+# PTM Sniffer --------------------------------------------------------------------------------------
+
+class PTMSniffer(LiteXModule):
+    def __init__(self, rx_clk, rx_data, rx_ctrl):
+        self.source = source = stream.Endpoint([("master_time", 64)])
+        assert len(rx_data) == 16
+        assert len(rx_ctrl) == 2
+
+        # # #
+
+        # Clocking.
+        self.cd_sniffer = ClockDomain()
+        self.comb += self.cd_sniffer.clk.eq(rx_clk)
+        # FIXME: Add reset.
+
+        # Raw Sniffing.
+        from gateware.sniffer import RawDatapath
+        from gateware.scrambling import RawDescrambler
+
+        self.raw_datapath    = ClockDomainsRenamer("sniffer")(RawDatapath(phy_dw=16))
+        self.raw_descrambler = ClockDomainsRenamer("sniffer")(RawDescrambler())
+        self.comb += [
+            self.raw_datapath.sink.valid.eq(1),
+            self.raw_datapath.sink.data.eq(rx_data),
+            self.raw_datapath.sink.ctrl.eq(rx_ctrl),
+            self.raw_datapath.source.connect(self.raw_descrambler.sink),
+        ]
+
+        # TLP Sniffing.
+        from gateware.sniffer import TLPAligner, TLPEndiannessSwap, TLPFilterFormater
+
+        self.tlp_aligner         = ClockDomainsRenamer("sniffer")(TLPAligner())
+        self.tlp_endianness_swap = ClockDomainsRenamer("sniffer")(TLPEndiannessSwap())
+        self.tlp_filter_formater = ClockDomainsRenamer("sniffer")(TLPFilterFormater())
+
+        self.submodules += stream.Pipeline(
+            self.raw_descrambler,
+            self.tlp_aligner,
+            self.tlp_endianness_swap,
+            self.tlp_filter_formater,
+        )
+
+        # TLP Depacketizer. FIXME: Direct inject TLPs in LitePCIe through an Arbiter.
+        from litepcie.tlp.depacketizer import LitePCIeTLPDepacketizer
+
+        self.tlp_depacketizer = ClockDomainsRenamer("sniffer")(LitePCIeTLPDepacketizer(
+            data_width   = 64,
+            endianness   = "big",
+            address_mask = 0,
+            capabilities = ["REQUEST", "COMPLETION", "CONFIGURATION", "PTM"],
+        ))
+        self.comb += self.tlp_filter_formater.source.connect(self.tlp_depacketizer.sink)
+        self.comb += [
+            self.tlp_depacketizer.req_source.ready.eq(1),
+            self.tlp_depacketizer.cmp_source.ready.eq(1),
+            self.tlp_depacketizer.conf_source.ready.eq(1),
+        ]
+
+        # TLP CDC.
+        self.cdc = cdc = stream.ClockDomainCrossing([("master_time", 64)], cd_from="sniffer", cd_to="sys")
+        self.comb += [
+            self.tlp_depacketizer.ptm_source.connect(cdc.sink, keep={"valid", "ready", "master_time"}),
+            cdc.source.connect(self.source)
         ]
 
 # PTM Core Constants -------------------------------------------------------------------------------

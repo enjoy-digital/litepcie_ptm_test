@@ -208,9 +208,9 @@ class S7PCIEPHY(LiteXModule):
 
         self.debug_clk     = Signal()
         self.debug_tx_data = Signal(16)
-        self.debug_tx_ctl  = Signal(4)
+        self.debug_tx_ctl  = Signal(2)
         self.debug_rx_data = Signal(16)
-        self.debug_rx_ctl  = Signal(4)
+        self.debug_rx_ctl  = Signal(2)
 
         self.pcie_phy_params = dict(
             #p_c_enable_msg_route = "11111111111",

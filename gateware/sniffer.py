@@ -12,6 +12,7 @@ from litex.gen import *
 from litex.soc.interconnect import stream
 
 from litepcie.common import phy_layout
+from litepcie.tlp.common import fmt_type_dict
 
 from gateware.common import COM, EndiannessSwap
 
@@ -277,19 +278,19 @@ class TLPFilterFormater(LiteXModule):
         self.fsm = fsm = FSM(reset_state="IDLE")
         fsm.act("IDLE",
             If(sink.valid,
-                # 3 DWs + 32-bit Data.
-                If(sink.data[24:32] == 0x34,
+                # PTM Request.
+                If(sink.data[24:32] == fmt_type_dict["ptm_req"],
                     fifo.sink.valid.eq(1),
                     fifo.sink.dat.eq(sink.data),
                     fifo.sink.be.eq(0b1111),
-                    NextValue(count, 3 - 1),
+                    NextValue(count, 3 - 1), # 3DWs Header.
                     NextState("RECEIVE")
-                # 4 DWs + 32-bit Data.
-                ).Elif(sink.data[24:32] == 0x74,
+                # PTM Response.
+                ).Elif(sink.data[24:32] == fmt_type_dict["ptm_res"],
                     fifo.sink.valid.eq(1),
                     fifo.sink.dat.eq(sink.data),
                     fifo.sink.be.eq(0b1111),
-                    NextValue(count, 4 - 1),
+                    NextValue(count, 4 - 1), # 4DWs Header.
                     NextState("RECEIVE")
                 ).Else(
                     NextState("END")

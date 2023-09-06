@@ -140,7 +140,7 @@ PTM_RESPONSED_MESSAGE_CODE = 0b01010011 # PTM Response with timing information.
 # PTM Core -----------------------------------------------------------------------------------------
 
 class PTMCore(LiteXModule):
-    def __init__(self, pcie_endpoint, sys_clk_freq):
+    def __init__(self, pcie_endpoint, sys_clk_freq, request_period=100e-3):
         # Input.
         self.ptm_enable = Signal()
 
@@ -150,7 +150,7 @@ class PTMCore(LiteXModule):
         self.req_ep = req_ep = pcie_endpoint.packetizer.ptm_sink
 
         # PTM Request Timer.
-        self.req_timer = req_timer = WaitTimer(1*sys_clk_freq)
+        self.req_timer = req_timer = WaitTimer(request_period*sys_clk_freq)
         self.comb += req_timer.wait.eq(~req_timer.done)
 
         # PTM Request FSM.

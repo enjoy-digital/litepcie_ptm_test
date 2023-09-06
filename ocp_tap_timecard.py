@@ -276,6 +276,7 @@ class BaseSoC(SoCMini):
                 #self.tlp_aligner.sink,
                 #self.tlp_aligner.fsm,
                 #self.tlp_aligner.sink,
+                self.rx_descrambler.source,
                 self.tlp_aligner.source,
                 #self.tx_descrambler.source,
                 #self.rx_datapath.skip_remover.skip,

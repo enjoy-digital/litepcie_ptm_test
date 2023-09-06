@@ -125,6 +125,7 @@ class TLPAligner(LiteXModule):
 
         # # #
 
+        first        = Signal()
         alignment    = Signal(2)
         sink_ctrl_d  = Signal(4)
         sink_ctrl_dd = Signal(4)
@@ -164,12 +165,14 @@ class TLPAligner(LiteXModule):
         )
         fsm.act("RECEIVE-0",
             If(sink.valid,
+                NextValue(first, 1),
                 NextState("RECEIVE-1")
             )
         )
         fsm.act("RECEIVE-1",
             If(sink.valid,
                 source.valid.eq(1),
+                NextValue(first, 0),
                 Case(alignment, {
                     0b00 : [
                         source.data[8*0:8*1].eq(sink_data_dd[8*3:8*4]),
@@ -213,7 +216,7 @@ class TLPAligner(LiteXModule):
                     ],
                 }),
             ),
-            If(sink.valid,
+            If(sink.valid & ~first,
                 If(sink_ctrl_dd[0] & (sink_data_dd[0*8:1*8] == 0xfd),
                    source.last.eq(1),
                    NextState("IDLE")

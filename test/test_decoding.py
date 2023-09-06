@@ -7,7 +7,7 @@ from litex.gen import *
 
 from litex.soc.interconnect import stream
 
-from dumps.dump004 import *
+from test.dumps.dump003 import *
 
 from gateware.serdes import RXDatapath
 from gateware.scrambling import Descrambler

@@ -7,7 +7,7 @@ from litex.gen import *
 
 from litex.soc.interconnect import stream
 
-from dumps.dump_ptm_response001 import *
+from test.dumps.dump_ptm_response001 import *
 
 from gateware.ptm import PTMTLPAligner, PTMTLP2AXI
 

@@ -264,7 +264,7 @@ class TLPFilterFormater(LiteXModule):
         self.comb += sink.ready.eq(1)
 
         # Data-FIFO (For eventual source unavailability absorbtion).
-        self.fifo = fifo = stream.SyncFIFO(phy_layout(32), depth=64)
+        self.fifo = fifo = stream.SyncFIFO(phy_layout(32), depth=4, buffered=True)
 
         # Data-Width Converter: 32-bit to 64-bit.
         self.conv = conv = stream.StrideConverter(
@@ -273,6 +273,7 @@ class TLPFilterFormater(LiteXModule):
             reverse          = False
         )
         self.comb += [
+            fifo.sink.be.eq(0b1111),
             fifo.source.connect(conv.sink),
             conv.source.connect(self.source),
         ]
@@ -285,14 +286,12 @@ class TLPFilterFormater(LiteXModule):
                 If(sink.data[24:32] == fmt_type_dict["ptm_req"],
                     fifo.sink.valid.eq(1),
                     fifo.sink.dat.eq(sink.data),
-                    fifo.sink.be.eq(0b1111),
                     NextValue(count, 3 - 1), # 3DWs Header.
                     NextState("RECEIVE")
                 # PTM Response.
                 ).Elif(sink.data[24:32] == fmt_type_dict["ptm_res"],
                     fifo.sink.valid.eq(1),
                     fifo.sink.dat.eq(sink.data),
-                    fifo.sink.be.eq(0b1111),
                     NextValue(count, 4 - 1), # 4DWs Header.
                     NextState("RECEIVE")
                 ).Else(
@@ -304,7 +303,6 @@ class TLPFilterFormater(LiteXModule):
             If(sink.valid,
                 fifo.sink.valid.eq(1),
                 fifo.sink.dat.eq(sink.data),
-                fifo.sink.be.eq(0b1111),
                 NextValue(count, count - 1),
                 If(count == 0,
                     fifo.sink.last.eq(1),

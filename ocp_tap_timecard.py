@@ -295,11 +295,6 @@ class BaseSoC(SoCMini):
                 csr_csv      = "analyzer.csv"
             )
 
-        from gateware.common import symbols
-        for symbol in symbols:
-            print(f"{symbol.name} : 0x{symbol.value:02x}")
-        #exit()
-
 # Build --------------------------------------------------------------------------------------------
 
 def main():

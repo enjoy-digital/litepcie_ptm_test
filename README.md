@@ -1,8 +1,8 @@
 [> Run Unit-tests
 -----------------
 ```sh
-python3 -m unittest test.test_decoding
-python3 -m unittest test.test_tlp_sniff
+$ python3 -m unittest test.test_decoding
+$ python3 -m unittest test.test_tlp_sniff
 ```
 
 [> Build and test design

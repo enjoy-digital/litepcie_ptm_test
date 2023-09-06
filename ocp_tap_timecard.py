@@ -243,7 +243,7 @@ class BaseSoC(SoCMini):
                 self.tx_descrambler.source.ready.eq(1),
             ]
 
-            from gateware.ptm import PTMTLPAligner, PTMTLP2AXI
+            from gateware.sniffer import PTMTLPAligner, PTMTLP2AXI
             from litepcie.tlp.depacketizer import LitePCIeTLPDepacketizer
 
             self.ptm_tlp_aligner = ClockDomainsRenamer("debug")(PTMTLPAligner())

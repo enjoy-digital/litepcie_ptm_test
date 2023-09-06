@@ -280,8 +280,8 @@ class BaseSoC(SoCMini):
                 #self.tlp_aligner.source,
                 #self.tlp_filter_formater.sink,
                 #self.tlp_filter_formater.fifo.sink,
-                self.tlp_filter_formater.source,
-                self.tlp_filter_formater.source,
+                #self.tlp_filter_formater.source,
+                #self.tlp_filter_formater.source,
                 #self.tx_descrambler.source,
                 #self.rx_datapath.skip_remover.skip,
                 #self.tx_datapath.skip_remover.skip,
@@ -294,6 +294,7 @@ class BaseSoC(SoCMini):
                 #self.ptm_sniffer_injector.source,
                 self.tlp_depacketizer.ptm_source.valid,
                 self.tlp_depacketizer.ptm_source.ready,
+                self.tlp_depacketizer.ptm_source.master_time,
                 #self.depacketizer.ptm_source.message_code,
                 #self.depacketizer.ptm_source.length,
             ]

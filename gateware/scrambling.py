@@ -4,9 +4,6 @@
 # Copyright (c) 2019-2020 Florent Kermarrec <florent@enjoy-digital.fr>
 # SPDX-License-Identifier: BSD-2-Clause
 
-from functools import reduce
-from operator import xor
-
 from migen import *
 
 from litex.soc.interconnect import stream
@@ -143,6 +140,5 @@ class RawDescrambler(Module):
         # Descramble data
         self.comb += [
             sink.connect(scrambler.sink),
-            scrambler.source.connect(source, omit={"data"}),
-            If(source.valid, source.data.eq(scrambler.source.data)),
+            scrambler.source.connect(source)
         ]

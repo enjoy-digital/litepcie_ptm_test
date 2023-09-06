@@ -68,7 +68,7 @@ class RawWordAligner(Module):
                 source.data.eq(data[8*i:]),
                 source.ctrl.eq(ctrl[1*i:]),
             ]
-        self.comb += If(source.valid, Case(alignment_d, cases))
+        self.comb += Case(alignment_d, cases)
 
 # Raw Datapath -------------------------------------------------------------------------------------
 

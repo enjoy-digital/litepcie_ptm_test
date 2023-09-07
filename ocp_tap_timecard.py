@@ -157,9 +157,10 @@ class BaseSoC(SoCMini):
 
         # PTM Sniffer.
         self.ptm_sniffer = PTMSniffer(
-            rx_clk  = self.pcie_phy.debug_clk,
-            rx_data = self.pcie_phy.debug_rx_data,
-            rx_ctrl = self.pcie_phy.debug_rx_ctl,
+            rx_rst_n = self.pcie_phy.sniffer_rst_n,
+            rx_clk   = self.pcie_phy.sniffer_clk,
+            rx_data  = self.pcie_phy.sniffer_rx_data,
+            rx_ctrl  = self.pcie_phy.sniffer_rx_ctl,
         )
 
         # PTM Requester.

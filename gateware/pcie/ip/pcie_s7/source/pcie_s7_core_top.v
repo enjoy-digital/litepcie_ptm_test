@@ -865,12 +865,12 @@ module pcie_s7_core_top # (
   input wire           sys_clk,
   input wire           sys_rst_n,
 
-  output wire          debug_rst_n,
-  output wire          debug_clk,
-  output wire [15 : 0] debug_tx_data,
-  output wire [1  : 0] debug_tx_ctl,
-  output wire [15 : 0] debug_rx_data,
-  output wire [1  : 0] debug_rx_ctl
+  output wire          sniffer_rst_n,
+  output wire          sniffer_clk,
+  output wire [15 : 0] sniffer_tx_data,
+  output wire [1  : 0] sniffer_tx_ctl,
+  output wire [15 : 0] sniffer_rx_data,
+  output wire [1  : 0] sniffer_rx_ctl
 );
 
   wire                 user_clk;
@@ -2153,11 +2153,11 @@ pcie_s7_gt_top #(
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////
 //enable_jtag_dbg = FALSE 
 
-  assign debug_rst_n   = pipe_mmcm_rst_n;
-  assign debug_clk     = pipe_clk;
-  assign debug_tx_data = pipe_tx0_data_gt;
-  assign debug_tx_ctl  = pipe_tx0_char_is_k_gt;
-  assign debug_rx_data = pipe_rx0_data_gt;
-  assign debug_rx_ctl  = pipe_rx0_char_is_k_gt;
+  assign sniffer_rst_n   = pipe_mmcm_rst_n;
+  assign sniffer_clk     = pipe_clk;
+  assign sniffer_tx_data = pipe_tx0_data_gt;
+  assign sniffer_tx_ctl  = pipe_tx0_char_is_k_gt;
+  assign sniffer_rx_data = pipe_rx0_data_gt;
+  assign sniffer_rx_ctl  = pipe_rx0_char_is_k_gt;
 
 endmodule

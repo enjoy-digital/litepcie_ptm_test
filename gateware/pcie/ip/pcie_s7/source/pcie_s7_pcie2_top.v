@@ -694,12 +694,12 @@ parameter     REDUCE_OOB_FREQ = "FALSE"
   input wire           sys_clk,
   input wire           sys_rst_n,
   
-  output wire debug_rst_n,
-  output wire debug_clk,
-  output wire [15 : 0] debug_tx_data,
-  output wire [1  : 0] debug_tx_ctl,
-  output wire [15 : 0] debug_rx_data,
-  output wire [1  : 0] debug_rx_ctl
+  output wire          sniffer_rst_n,
+  output wire          sniffer_clk,
+  output wire [15 : 0] sniffer_tx_data,
+  output wire [1  : 0] sniffer_tx_ctl,
+  output wire [15 : 0] sniffer_rx_data,
+  output wire [1  : 0] sniffer_rx_ctl
 );
 
 pcie_s7_core_top  # (
@@ -1018,12 +1018,12 @@ pcie_s7_core_top  # (
     .sys_rst_n                                  (sys_rst_n),
 
 
-    .debug_rst_n(debug_rst_n),
-    .debug_clk(debug_clk),
-    .debug_tx_data(debug_tx_data),
-    .debug_tx_ctl(debug_tx_ctl),
-    .debug_rx_data(debug_rx_data),
-    .debug_rx_ctl(debug_rx_ctl)
+    .sniffer_rst_n   ( sniffer_rst_n   ),
+    .sniffer_clk     ( sniffer_clk     ),
+    .sniffer_tx_data ( sniffer_tx_data ),
+    .sniffer_tx_ctl  ( sniffer_tx_ctl  ),
+    .sniffer_rx_data ( sniffer_rx_data ),
+    .sniffer_rx_ctl  ( sniffer_rx_ctl  )
 
   );
 

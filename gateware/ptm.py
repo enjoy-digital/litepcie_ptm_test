@@ -133,7 +133,7 @@ class PTMCapabilities(LiteXModule):
 # PTM Sniffer --------------------------------------------------------------------------------------
 
 class PTMSniffer(LiteXModule):
-    def __init__(self, rx_clk, rx_data, rx_ctrl):
+    def __init__(self, rx_rst_n, rx_clk, rx_data, rx_ctrl):
         self.source = source = stream.Endpoint([("master_time", 64), ("propagation_delay", 32)])
         assert len(rx_data) == 16
         assert len(rx_ctrl) == 2
@@ -143,7 +143,7 @@ class PTMSniffer(LiteXModule):
         # Clocking.
         self.cd_sniffer = ClockDomain()
         self.comb += self.cd_sniffer.clk.eq(rx_clk)
-        # FIXME: Add reset.
+        self.comb += self.cd_sniffer.rst.eq(~rx_rst_n)
 
         # Raw Sniffing.
         from gateware.sniffer import RawDatapath

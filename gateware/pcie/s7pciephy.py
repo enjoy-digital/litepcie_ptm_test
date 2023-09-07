@@ -206,12 +206,12 @@ class S7PCIEPHY(LiteXModule):
 
         self.cfg_msg_received = Signal()
 
-        self.debug_rst_n   = Signal()
-        self.debug_clk     = Signal()
-        self.debug_tx_data = Signal(16)
-        self.debug_tx_ctl  = Signal(2)
-        self.debug_rx_data = Signal(16)
-        self.debug_rx_ctl  = Signal(2)
+        self.sniffer_rst_n   = Signal()
+        self.sniffer_clk     = Signal()
+        self.sniffer_tx_data = Signal(16)
+        self.sniffer_tx_ctl  = Signal(2)
+        self.sniffer_rx_data = Signal(16)
+        self.sniffer_rx_ctl  = Signal(2)
 
         self.pcie_phy_params = dict(
             #p_c_enable_msg_route = "11111111111",
@@ -429,12 +429,12 @@ class S7PCIEPHY(LiteXModule):
             o_pcie_drp_rdy  = Open(),
             o_pcie_drp_do   = Open(),
 
-            o_debug_rst_n   = self.debug_rst_n,
-            o_debug_clk     = self.debug_clk,
-            o_debug_tx_data = self.debug_tx_data,
-            o_debug_tx_ctl  = self.debug_tx_ctl,
-            o_debug_rx_data = self.debug_rx_data,
-            o_debug_rx_ctl  = self.debug_rx_ctl,
+            o_sniffer_rst_n   = self.sniffer_rst_n,
+            o_sniffer_clk     = self.sniffer_clk,
+            o_sniffer_tx_data = self.sniffer_tx_data,
+            o_sniffer_tx_ctl  = self.sniffer_tx_ctl,
+            o_sniffer_rx_data = self.sniffer_rx_data,
+            o_sniffer_rx_ctl  = self.sniffer_rx_ctl,
         )
         if pcie_data_width == 128:
             rx_is_sof = m_axis_rx_tuser[10:15] # Start of a new packet header in m_axis_rx_tdata.

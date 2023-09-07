@@ -81,12 +81,13 @@ class BaseSoC(SoCMini):
         "pcie_msi_table": 4, # Requires fixed mapping for MSI-X.
     }
     def __init__(self, sys_clk_freq=100e6, pcie_address_width=32, pcie_msi_type="msi-x", with_ptm=True,
-        with_jtagbone           = True,
-        with_led_chaser         = True,
-        with_msi_analyzer       = False,
-        with_ptm_conf_analyzer  = False,
-        with_ptm_tlp_analyzer   = False,
-        with_pcie_gtp_analyzer  = True,
+        with_jtagbone                = True,
+        with_led_chaser              = True,
+        with_msi_analyzer            = False,
+        with_ptm_conf_analyzer       = False,
+        with_ptm_tlp_analyzer        = False,
+        with_pcie_sniffer_analyzer   = False,
+        with_pcie_requester_analyzer = True,
         **kwargs):
         platform = ocp_tap_timecard.Platform()
 
@@ -152,10 +153,27 @@ class BaseSoC(SoCMini):
 
         # PTM --------------------------------------------------------------------------------------
 
-        from gateware.ptm import PTMCore
+        from gateware.ptm import PTMSniffer, PTMRequester
 
-        self.ptm_core = PTMCore(self.pcie_endpoint, sys_clk_freq)
-        self.comb += self.ptm_core.ptm_enable.eq(self.ptm_capabilities.ptm_enable)
+        # PTM Sniffer.
+        self.ptm_sniffer = PTMSniffer(
+            rx_clk  = self.pcie_phy.debug_clk,
+            rx_data = self.pcie_phy.debug_rx_data,
+            rx_ctrl = self.pcie_phy.debug_rx_ctl,
+        )
+
+        # PTM Requester.
+        self.ptm_requester = PTMRequester(
+            pcie_endpoint = self.pcie_endpoint,
+            ptm_sniffer   = self.ptm_sniffer,
+            sys_clk_freq  = sys_clk_freq,
+        )
+        self.comb += self.ptm_requester.ptm_enable.eq(self.ptm_capabilities.ptm_enable)
+
+        # PTM Trigger.
+        self.ptm_trigger = WaitTimer(100e-3*sys_clk_freq)
+        self.comb += self.ptm_trigger.wait.eq(~self.ptm_trigger.done)
+        self.comb += self.ptm_requester.ptm_trigger.eq(self.ptm_trigger.done)
 
         # Analyzer ---------------------------------------------------------------------------------
 
@@ -210,19 +228,30 @@ class BaseSoC(SoCMini):
                 csr_csv      = "analyzer.csv"
             )
 
-        if with_pcie_gtp_analyzer:
-            from gateware.ptm import PTMSniffer
-
-            self.ptm_sniffer = PTMSniffer(
-                rx_clk  = self.pcie_phy.debug_clk,
-                rx_data = self.pcie_phy.debug_rx_data,
-                rx_ctrl = self.pcie_phy.debug_rx_ctl
-            )
-            self.comb += self.ptm_sniffer.source.ready.eq(1)
+        if with_pcie_sniffer_analyzer:
             # Analyzer
             analyzer_signals = [
-                self.ptm_core.fsm,
+                self.ptm_requester.ptm_trigger,
                 self.ptm_sniffer.source,
+            ]
+            self.analyzer = LiteScopeAnalyzer(analyzer_signals,
+                depth        = 2048,
+                register     = True,
+                samplerate   = 125e6,
+                clock_domain = "sys",
+                csr_csv      = "analyzer.csv"
+            )
+
+        if with_pcie_requester_analyzer:
+            # Analyzer
+            analyzer_signals = [
+                self.ptm_requester.ptm_enable,
+                self.ptm_requester.ptm_trigger,
+                self.ptm_requester.ptm_invalidation,
+                self.ptm_requester.ptm_valid,
+                self.ptm_requester.ptm_update,
+                self.ptm_requester.ptm_master_time,
+                self.ptm_requester.ptm_propagation_delay,
             ]
             self.analyzer = LiteScopeAnalyzer(analyzer_signals,
                 depth        = 2048,

@@ -865,7 +865,8 @@ module pcie_s7_core_top # (
   input wire           sys_clk,
   input wire           sys_rst_n,
 
-  output wire debug_clk,
+  output wire          debug_rst_n,
+  output wire          debug_clk,
   output wire [15 : 0] debug_tx_data,
   output wire [1  : 0] debug_tx_ctl,
   output wire [15 : 0] debug_rx_data,
@@ -2152,6 +2153,7 @@ pcie_s7_gt_top #(
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////
 //enable_jtag_dbg = FALSE 
 
+  assign debug_rst_n   = pipe_mmcm_rst_n;
   assign debug_clk     = pipe_clk;
   assign debug_tx_data = pipe_tx0_data_gt;
   assign debug_tx_ctl  = pipe_tx0_char_is_k_gt;

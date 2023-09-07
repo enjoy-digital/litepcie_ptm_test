@@ -240,6 +240,7 @@ module pcie_s7 (
   pcie_drp_di,
   pcie_drp_do,
   pcie_drp_rdy,
+  debug_rst_n,
   debug_clk,
   debug_tx_data,
   debug_tx_ctl,
@@ -603,6 +604,7 @@ output wire [15 : 0] pcie_drp_do;
 (* X_INTERFACE_INFO = "xilinx.com:interface:drp:1.0 drp DRDY" *)
 output wire pcie_drp_rdy;
 
+output wire debug_rst_n;
 output wire debug_clk;
 output wire [15 : 0] debug_tx_data;
 output wire [1  : 0] debug_tx_ctl;
@@ -1113,6 +1115,7 @@ output wire [1  : 0] debug_rx_ctl;
     .pipe_tx_5_sigs(),
     .pipe_tx_6_sigs(),
     .pipe_tx_7_sigs(),
+    .debug_rst_n(debug_rst_n),
     .debug_clk(debug_clk),
     .debug_tx_data(debug_tx_data),
     .debug_tx_ctl(debug_tx_ctl),

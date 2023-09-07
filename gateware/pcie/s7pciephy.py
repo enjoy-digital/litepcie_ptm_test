@@ -206,6 +206,7 @@ class S7PCIEPHY(LiteXModule):
 
         self.cfg_msg_received = Signal()
 
+        self.debug_rst_n   = Signal()
         self.debug_clk     = Signal()
         self.debug_tx_data = Signal(16)
         self.debug_tx_ctl  = Signal(2)
@@ -428,6 +429,7 @@ class S7PCIEPHY(LiteXModule):
             o_pcie_drp_rdy  = Open(),
             o_pcie_drp_do   = Open(),
 
+            o_debug_rst_n   = self.debug_rst_n,
             o_debug_clk     = self.debug_clk,
             o_debug_tx_data = self.debug_tx_data,
             o_debug_tx_ctl  = self.debug_tx_ctl,

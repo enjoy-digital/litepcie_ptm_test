@@ -87,7 +87,7 @@ class BaseSoC(SoCMini):
         with_ptm_conf_analyzer       = False,
         with_ptm_tlp_analyzer        = False,
         with_pcie_sniffer_analyzer   = False,
-        with_pcie_requester_analyzer = True,
+        with_pcie_requester_analyzer = False,
         **kwargs):
         platform = ocp_tap_timecard.Platform()
 
@@ -175,6 +175,28 @@ class BaseSoC(SoCMini):
         self.ptm_trigger = WaitTimer(100e-3*sys_clk_freq)
         self.comb += self.ptm_trigger.wait.eq(~self.ptm_trigger.done)
         self.comb += self.ptm_requester.ptm_trigger.eq(self.ptm_trigger.done)
+
+        counter = Signal(32)
+        self.sync += counter.eq(counter + 1)
+        sma0 = platform.request("sma", 0)
+        self.comb += sma0.dat_in_en.eq(1)
+        self.comb += sma0.dat_out_en.eq(0)
+        self.comb += sma0.dat_out.eq(counter[10])
+
+        sma1 = platform.request("sma", 1)
+        self.comb += sma1.dat_in_en.eq(1)
+        self.comb += sma1.dat_out_en.eq(0)
+        self.comb += sma1.dat_out.eq(counter[10])
+
+        sma2 = platform.request("sma", 2)
+        self.comb += sma2.dat_in_en.eq(1)
+        self.comb += sma2.dat_out_en.eq(0)
+        self.comb += sma2.dat_out.eq(counter[10])
+
+        sma3 = platform.request("sma", 3)
+        self.comb += sma3.dat_in_en.eq(1)
+        self.comb += sma3.dat_out_en.eq(0)
+        self.comb += sma3.dat_out.eq(counter[10])
 
         # Analyzer ---------------------------------------------------------------------------------
 

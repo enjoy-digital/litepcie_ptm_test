@@ -261,6 +261,15 @@ class BaseSoC(SoCMini):
                 csr_csv      = "analyzer.csv"
             )
 
+            self._ptm_valid             = CSRStatus()
+            self._ptm_master_time       = CSRStatus(64)
+            self._ptm_propagation_delay = CSRStatus(32)
+            self.sync += [
+                self._ptm_valid.status.eq(self.ptm_requester.ptm_valid),
+                self._ptm_master_time.status.eq(self.ptm_requester.ptm_master_time),
+                self._ptm_propagation_delay.status.eq(self.ptm_requester.ptm_propagation_delay),
+            ]
+
 # Build --------------------------------------------------------------------------------------------
 
 def main():

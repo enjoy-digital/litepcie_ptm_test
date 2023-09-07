@@ -248,14 +248,13 @@ class BaseSoC(SoCMini):
             analyzer_signals = [
                 self.ptm_requester.ptm_enable,
                 self.ptm_requester.ptm_trigger,
-                self.ptm_requester.ptm_invalidation,
                 self.ptm_requester.ptm_valid,
                 self.ptm_requester.ptm_update,
                 self.ptm_requester.ptm_master_time,
                 self.ptm_requester.ptm_propagation_delay,
             ]
             self.analyzer = LiteScopeAnalyzer(analyzer_signals,
-                depth        = 2048,
+                depth        = 256,
                 register     = True,
                 samplerate   = 125e6,
                 clock_domain = "sys",

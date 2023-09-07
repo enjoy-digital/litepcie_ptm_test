@@ -196,7 +196,9 @@ class PTMSniffer(LiteXModule):
         )
         self.comb += [
             self.tlp_depacketizer.ptm_source.connect(cdc.sink, keep={"valid", "ready", "master_time"}),
-            cdc.sink.propagation_delay.eq(self.tlp_depacketizer.ptm_source.dat), # CHECKME.
+            cdc.sink.master_time[ 0:32].eq(self.tlp_depacketizer.ptm_source.master_time[32:64]),
+            cdc.sink.master_time[32:64].eq(self.tlp_depacketizer.ptm_source.master_time[ 0:32]),
+            cdc.sink.propagation_delay.eq(reverse_bytes(self.tlp_depacketizer.ptm_source.dat[32:64])),
             cdc.source.connect(self.source)
         ]
 
@@ -233,7 +235,7 @@ class PTMRequester(LiteXModule):
         self.req_timer = req_timer = WaitTimer(1e-6*sys_clk_freq)
 
         # PTM Requester FSM.
-        self.fsm = fsm = ResetInserter()(FSM(reset_state="IDLE"))
+        self.fsm = fsm = ResetInserter()(FSM(reset_state="START"))
         self.comb += fsm.reset.eq(~self.ptm_enable)
         fsm.act("START",
             If(self.ptm_enable,
@@ -265,7 +267,7 @@ class PTMRequester(LiteXModule):
                     NextState("WAIT-1-US")
                 ).Else(
                     self.ptm_update.eq(1),
-                    NextValue(self.ptm_master_time,       ptm_sniffer.source.master_time),
+                    NextValue(self.ptm_master_time, ptm_sniffer.source.master_time),
                     NextValue(self.ptm_propagation_delay, ptm_sniffer.source.propagation_delay),
                     NextState("VALID-PTM-CONTEXT")
                 )

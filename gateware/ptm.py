@@ -211,17 +211,17 @@ PTM_RESPONSED_MESSAGE_CODE = 0b01010011 # PTM Response with timing information.
 # PTM Requester ------------------------------------------------------------------------------------
 
 class PTMRequester(LiteXModule):
-    def __init__(self, pcie_endpoint, ptm_sniffer, sys_clk_freq):
+    def __init__(self, pcie_endpoint, ptm_sniffer, sys_clk_freq,):
         # Inputs.
-        self.ptm_enable       = Signal()
-        self.ptm_trigger      = Signal()
-        self.ptm_invalidation = Signal()
+        self.enable       = Signal()
+        self.trigger      = Signal()
+        self.invalidate = Signal()
 
         # Outputs.
-        self.ptm_valid             = Signal()
-        self.ptm_update            = Signal()
-        self.ptm_master_time       = Signal(64)
-        self.ptm_propagation_delay = Signal(32)
+        self.valid             = Signal()
+        self.update            = Signal()
+        self.master_time       = Signal(64)
+        self.propagation_delay = Signal(32)
 
         # # #
 
@@ -236,14 +236,14 @@ class PTMRequester(LiteXModule):
 
         # PTM Requester FSM.
         self.fsm = fsm = ResetInserter()(FSM(reset_state="START"))
-        self.comb += fsm.reset.eq(~self.ptm_enable)
+        self.comb += fsm.reset.eq(~self.enable)
         fsm.act("START",
-            If(self.ptm_enable,
+            If(self.enable,
                 NextState("INVALID-PTM-CONTEXT")
             )
         )
         fsm.act("INVALID-PTM-CONTEXT",
-            If(self.ptm_trigger,
+            If(self.trigger,
                 NextState("ISSUE-PTM-REQUEST")
             )
         )
@@ -266,9 +266,9 @@ class PTMRequester(LiteXModule):
                 If(ptm_sniffer.source.master_time == 0, # FIXME: Add Response/ResponseD indication.
                     NextState("WAIT-1-US")
                 ).Else(
-                    NextValue(self.ptm_update, 1),
-                    NextValue(self.ptm_master_time, ptm_sniffer.source.master_time),
-                    NextValue(self.ptm_propagation_delay, ptm_sniffer.source.propagation_delay),
+                    NextValue(self.update, 1),
+                    NextValue(self.master_time, ptm_sniffer.source.master_time),
+                    NextValue(self.propagation_delay, ptm_sniffer.source.propagation_delay),
                     NextState("VALID-PTM-CONTEXT")
                 )
             )
@@ -280,12 +280,12 @@ class PTMRequester(LiteXModule):
             )
         )
         fsm.act("VALID-PTM-CONTEXT",
-            self.ptm_valid.eq(1),
-            NextValue(self.ptm_update, 0),
-            If(self.ptm_trigger,
+            self.valid.eq(1),
+            NextValue(self.update, 0),
+            If(self.trigger,
                 NextState("ISSUE-PTM-REQUEST")
             ),
-            If(self.ptm_invalidation,
+            If(self.invalidate,
                 NextState("INVALID-PTM-CONTEXT")
-            ),
+            )
         )

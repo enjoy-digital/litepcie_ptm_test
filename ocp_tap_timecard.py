@@ -171,37 +171,20 @@ class BaseSoC(SoCMini):
             sys_clk_freq  = sys_clk_freq,
         )
 
-        # PTM Local Clock (Updated on PTM Response).
-        ptm_local_clk = Signal(64)
+        # PTM Local Time (Updated on PTM Response).
+        ptm_local_time = Signal(64)
         self.sync += [
             If(self.ptm_requester.update,
-                ptm_local_clk.eq(self.ptm_requester.master_time)
+                ptm_local_time.eq(self.ptm_requester.master_time)
             ).Else(
-                ptm_local_clk.eq(ptm_local_clk + 10)
+                ptm_local_time.eq(ptm_local_time + 10)
             )
         ]
 
-        # PPS Generation from PTM Local Clock.
-        pps_start = Signal()
-        pps_count = Signal(32)
-        self.pps_fsm = pps_fsm = FSM(reset_state="IDLE")
-        pps_fsm.act("IDLE",
-            If(self.ptm_requester.valid,
-                NextValue(pps_count, 0),
-                NextState("RUN")
-            )
-        )
-        pps_fsm.act("RUN",
-            If(ptm_local_clk > (pps_count * int(1e9)),
-                pps_start.eq(1),
-                NextValue(pps_count, pps_count + 1)
-            )
-        )
-
-        # PPS Led.
-        self.pps_timer = WaitTimer(sys_clk_freq*200e-3) # 20% High / 80% Low PPS.
-        self.comb += self.pps_timer.wait.eq(~pps_start)
-        self.comb += platform.request("som_led").eq(~self.pps_timer.done)
+        # PPS Generator.
+        from gateware.pps import PPSGenerator
+        self.pps_generator = PPSGenerator(sys_clk_freq, time=ptm_local_time)
+        self.comb += platform.request("som_led").eq(self.pps_generator.pps)
 
         # Analyzer ---------------------------------------------------------------------------------
 
@@ -293,11 +276,7 @@ class BaseSoC(SoCMini):
             analyzer_signals = [
                 self.ptm_requester.valid,
                 self.ptm_requester.update,
-                ptm_local_clk,
-                pps_count,
-                pps_start,
-                self.pps_timer.wait,
-                self.pps_timer.done,
+                ptm_local_time,
             ]
             self.analyzer = LiteScopeAnalyzer(analyzer_signals,
                 depth        = 256,

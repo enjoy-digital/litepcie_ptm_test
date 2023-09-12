@@ -10,6 +10,7 @@ from migen import *
 from litex.gen import *
 from litex.gen.genlib.misc import WaitTimer
 
+from litex.soc.interconnect.csr import *
 from litex.soc.interconnect import stream
 
 from gateware.common import *
@@ -211,10 +212,10 @@ PTM_RESPONSED_MESSAGE_CODE = 0b01010011 # PTM Response with timing information.
 # PTM Requester ------------------------------------------------------------------------------------
 
 class PTMRequester(LiteXModule):
-    def __init__(self, pcie_endpoint, ptm_sniffer, sys_clk_freq,):
+    def __init__(self, pcie_endpoint, ptm_sniffer, sys_clk_freq, with_csr=True):
         # Inputs.
-        self.enable       = Signal()
-        self.trigger      = Signal()
+        self.enable     = Signal()
+        self.trigger    = Signal()
         self.invalidate = Signal()
 
         # Outputs.
@@ -222,6 +223,9 @@ class PTMRequester(LiteXModule):
         self.update            = Signal()
         self.master_time       = Signal(64)
         self.propagation_delay = Signal(32)
+
+        if with_csr:
+            self.add_csr(sys_clk_freq)
 
         # # #
 
@@ -289,3 +293,36 @@ class PTMRequester(LiteXModule):
                 NextState("INVALID-PTM-CONTEXT")
             )
         )
+
+    def add_csr(self, sys_clk_freq, default_enable=1):
+        self._control = CSRStorage(fields=[
+            CSRField("enable", size=1, offset=0, values=[
+                ("``0b0``", "PTM Requester Disabled."),
+                ("``0b1``", "PTM Requester Enabled."),
+            ], reset=default_enable),
+        ])
+        self._status = CSRStatus(fields=[
+            CSRField("valid", size=1, offset=0, values=[
+                ("``0b0``", "PTM Context Invalid."),
+                ("``0b1``", "PTM Context Valid."),
+            ]),
+        ])
+        self._master_time       = CSRStatus(64, description="PTM Master Time (in ns).")
+        self._propagation_delay = CSRStatus(32, description="PTM Propagation Delay (in ns).")
+
+        # # #
+
+        self.comb += [
+            # Control.
+            self.enable.eq(self._control.fields.enable),
+            # Status.
+            self._status.fields.valid.eq(self.valid),
+            # Time.
+            self._master_time.status.eq(self.master_time),
+            self._propagation_delay.status.eq(self.propagation_delay),
+        ]
+
+        # Trigger. FIXME: Make it configurable.
+        self._trigger = WaitTimer(100e-3*sys_clk_freq)
+        self.comb += self._trigger.wait.eq(~self._trigger.done)
+        self.comb += self.trigger.eq(self._trigger.done)

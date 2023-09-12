@@ -1,24 +1,43 @@
 #!/usr/bin/env python3
 
 import time
+import argparse
 
 from litex import RemoteClient
 
-bus = RemoteClient()
-bus.open()
+# Test ---------------------------------------------------------------------------------------------
 
-# # #
+def test_ptm(enable=1, loops=16):
+    # Create Bus.
+    bus = RemoteClient()
+    bus.open()
 
-master_time_current = 0
-master_time_last    = 0
-master_time_diff    = 0
-while True:
-    master_time_current = bus.regs.main_ptm_master_time.read()
-    master_time_diff    = master_time_current - master_time_last
-    print(master_time_diff/1e9)
-    time.sleep(1)
-    master_time_last = master_time_current
+    # Parameters.
+    loop = 0
 
-# # #
+    # Configure PTM Requester.
+    bus.regs.ptm_requester_control.write(enable)
 
-bus.close()
+    # Read Master Time received by PTM Requester.
+    while loop < loops:
+        r =  f"time (s): {bus.regs.ptm_requester_master_time.read()/1e9:3.2f} "
+        r += f"delay (ns): {bus.regs.ptm_requester_propagation_delay.read():d}"
+        print(r)
+        loop += 1
+        time.sleep(1)
+
+    # Close Bus.
+    bus.close()
+
+# Run ----------------------------------------------------------------------------------------------
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--enable", default=1, type=int, help="PTM Enable.")
+    parser.add_argument("--loops",  default=8, type=int, help="Test Loops.")
+    args = parser.parse_args()
+
+    test_ptm(enable=args.enable, loops=args.loops)
+
+if __name__ == "__main__":
+    main()

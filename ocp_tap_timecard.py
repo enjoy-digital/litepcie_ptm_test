@@ -170,22 +170,6 @@ class BaseSoC(SoCMini):
             ptm_sniffer   = self.ptm_sniffer,
             sys_clk_freq  = sys_clk_freq,
         )
-        self.comb += self.ptm_requester.enable.eq(self.ptm_capabilities.ptm_enable)
-
-        # PTM Trigger.
-        self.ptm_trigger = WaitTimer(100e-3*sys_clk_freq)
-        self.comb += self.ptm_trigger.wait.eq(~self.ptm_trigger.done)
-        self.comb += self.ptm_requester.trigger.eq(self.ptm_trigger.done)
-
-        # PTM CSRs.
-        self._ptm_valid             = CSRStatus()
-        self._ptm_master_time       = CSRStatus(64)
-        self._ptm_propagation_delay = CSRStatus(32)
-        self.sync += [
-            self._ptm_valid.status.eq(self.ptm_requester.valid),
-            self._ptm_master_time.status.eq(self.ptm_requester.master_time),
-            self._ptm_propagation_delay.status.eq(self.ptm_requester.propagation_delay),
-        ]
 
         # PTM Local Clock (Updated on PTM Response).
         ptm_local_clk = Signal(64)

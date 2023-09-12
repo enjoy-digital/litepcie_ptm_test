@@ -80,7 +80,7 @@ class BaseSoC(SoCMini):
         "pcie_msi":       3, # Requires fixed mapping for MSI-X.
         "pcie_msi_table": 4, # Requires fixed mapping for MSI-X.
     }
-    def __init__(self, sys_clk_freq=100e6, pcie_address_width=32, pcie_msi_type="msi-x", with_ptm=True,
+    def __init__(self, sys_clk_freq=125e6, pcie_address_width=32, pcie_msi_type="msi-x", with_ptm=True,
         with_jtagbone                = True,
         with_led_chaser              = True,
         with_msi_analyzer            = False,
@@ -150,11 +150,15 @@ class BaseSoC(SoCMini):
 
         from gateware.ptm import PTMCapabilities
 
-        self.ptm_capabilities = PTMCapabilities(self.pcie_endpoint)
+        self.ptm_capabilities = PTMCapabilities(
+            pcie_endpoint     = self.pcie_endpoint,
+            requester_capable = True,
+            responder_capable = True,
+        )
 
         # PTM --------------------------------------------------------------------------------------
 
-        from gateware.ptm import PTMSniffer, PTMRequester, PTMTimeGenerator
+        from gateware.ptm import PTMSniffer, PTMRequester, PTMTimeGenerator, PTMResponder
 
         # PTM Sniffer.
         self.ptm_sniffer = PTMSniffer(
@@ -175,6 +179,13 @@ class BaseSoC(SoCMini):
         self.ptm_time_generator = PTMTimeGenerator(
             sys_clk_freq  = sys_clk_freq,
             ptm_requester = self.ptm_requester,
+        )
+
+        # PTM Responder.
+        self.ptm_responder = PTMResponder(
+            pcie_endpoint = self.pcie_endpoint,
+            ptm_sniffer   = self.ptm_sniffer,
+            sys_clk_freq  = sys_clk_freq,
         )
 
         # PPS Generator.
@@ -288,8 +299,8 @@ def main():
     from litex.build.parser import LiteXArgumentParser
     parser = LiteXArgumentParser(platform=ocp_tap_timecard.Platform, description="LiteX SoC on OCP-TAP TimeCard.")
     parser.add_target_argument("--flash",        action="store_true",       help="Flash bitstream.")
-    parser.add_target_argument("--sys-clk-freq", default=100e6, type=float, help="System clock frequency.")
-    parser.add_target_argument("--driver",       action="store_true", help="Generate PCIe driver.")
+    parser.add_target_argument("--sys-clk-freq", default=125e6, type=float, help="System clock frequency.")
+    parser.add_target_argument("--driver",       action="store_true",       help="Generate PCIe driver.")
     args = parser.parse_args()
 
     soc = BaseSoC(

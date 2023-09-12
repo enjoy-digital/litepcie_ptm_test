@@ -98,6 +98,8 @@ _io = [
     ("led", 2, Pins("E22"), IOStandard("LVCMOS33")),
     ("led", 3, Pins("D22"), IOStandard("LVCMOS33")),
 
+    ("som_led", 0, Pins("W5"), IOStandard("LVCMOS33")),
+
     # I2C.
     ("i2c", 0,
         Subsignal("scl", Pins("N17"), Misc("PULLUP=True")),

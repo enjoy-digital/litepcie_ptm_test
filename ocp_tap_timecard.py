@@ -88,6 +88,7 @@ class BaseSoC(SoCMini):
         with_ptm_tlp_analyzer        = False,
         with_pcie_sniffer_analyzer   = False,
         with_pcie_requester_analyzer = False,
+        with_pps_analyzer            = True,
         **kwargs):
         platform = ocp_tap_timecard.Platform()
 
@@ -176,27 +177,47 @@ class BaseSoC(SoCMini):
         self.comb += self.ptm_trigger.wait.eq(~self.ptm_trigger.done)
         self.comb += self.ptm_requester.ptm_trigger.eq(self.ptm_trigger.done)
 
-        counter = Signal(32)
-        self.sync += counter.eq(counter + 1)
-        sma0 = platform.request("sma", 0)
-        self.comb += sma0.dat_in_en.eq(1)
-        self.comb += sma0.dat_out_en.eq(0)
-        self.comb += sma0.dat_out.eq(counter[10])
+        # PTM CSRs.
+        self._ptm_valid             = CSRStatus()
+        self._ptm_master_time       = CSRStatus(64)
+        self._ptm_propagation_delay = CSRStatus(32)
+        self.sync += [
+            self._ptm_valid.status.eq(self.ptm_requester.ptm_valid),
+            self._ptm_master_time.status.eq(self.ptm_requester.ptm_master_time),
+            self._ptm_propagation_delay.status.eq(self.ptm_requester.ptm_propagation_delay),
+        ]
 
-        sma1 = platform.request("sma", 1)
-        self.comb += sma1.dat_in_en.eq(1)
-        self.comb += sma1.dat_out_en.eq(0)
-        self.comb += sma1.dat_out.eq(counter[10])
+        # PTM Local Clock (Updated on PTM Response).
+        ptm_local_clk = Signal(64)
+        self.sync += [
+            If(self.ptm_requester.ptm_update,
+                ptm_local_clk.eq(self.ptm_requester.ptm_master_time)
+            ).Else(
+                ptm_local_clk.eq(ptm_local_clk + 10)
+            )
+        ]
 
-        sma2 = platform.request("sma", 2)
-        self.comb += sma2.dat_in_en.eq(1)
-        self.comb += sma2.dat_out_en.eq(0)
-        self.comb += sma2.dat_out.eq(counter[10])
+        # PPS Generation from PTM Local Clock.
+        pps_start = Signal()
+        pps_count = Signal(32)
+        self.pps_fsm = pps_fsm = FSM(reset_state="IDLE")
+        pps_fsm.act("IDLE",
+            If(self.ptm_requester.ptm_valid,
+                NextValue(pps_count, 0),
+                NextState("RUN")
+            )
+        )
+        pps_fsm.act("RUN",
+            If(ptm_local_clk > (pps_count * int(1e9)),
+                pps_start.eq(1),
+                NextValue(pps_count, pps_count + 1)
+            )
+        )
 
-        sma3 = platform.request("sma", 3)
-        self.comb += sma3.dat_in_en.eq(1)
-        self.comb += sma3.dat_out_en.eq(0)
-        self.comb += sma3.dat_out.eq(counter[10])
+        # PPS Led.
+        self.pps_timer = WaitTimer(sys_clk_freq*200e-3) # 20% High / 80% Low PPS.
+        self.comb += self.pps_timer.wait.eq(~pps_start)
+        self.comb += platform.request("som_led").eq(~self.pps_timer.done)
 
         # Analyzer ---------------------------------------------------------------------------------
 
@@ -260,7 +281,7 @@ class BaseSoC(SoCMini):
             self.analyzer = LiteScopeAnalyzer(analyzer_signals,
                 depth        = 2048,
                 register     = True,
-                samplerate   = 125e6,
+                samplerate   = 100e6,
                 clock_domain = "sys",
                 csr_csv      = "analyzer.csv"
             )
@@ -278,19 +299,29 @@ class BaseSoC(SoCMini):
             self.analyzer = LiteScopeAnalyzer(analyzer_signals,
                 depth        = 256,
                 register     = True,
-                samplerate   = 125e6,
+                samplerate   = 100e6,
                 clock_domain = "sys",
                 csr_csv      = "analyzer.csv"
             )
 
-            self._ptm_valid             = CSRStatus()
-            self._ptm_master_time       = CSRStatus(64)
-            self._ptm_propagation_delay = CSRStatus(32)
-            self.sync += [
-                self._ptm_valid.status.eq(self.ptm_requester.ptm_valid),
-                self._ptm_master_time.status.eq(self.ptm_requester.ptm_master_time),
-                self._ptm_propagation_delay.status.eq(self.ptm_requester.ptm_propagation_delay),
+        if with_pps_analyzer:
+            # Analyzer
+            analyzer_signals = [
+                self.ptm_requester.ptm_valid,
+                self.ptm_requester.ptm_update,
+                ptm_local_clk,
+                pps_count,
+                pps_start,
+                self.pps_timer.wait,
+                self.pps_timer.done,
             ]
+            self.analyzer = LiteScopeAnalyzer(analyzer_signals,
+                depth        = 256,
+                register     = True,
+                samplerate   = 100e6,
+                clock_domain = "sys",
+                csr_csv      = "analyzer.csv"
+            )
 
 # Build --------------------------------------------------------------------------------------------
 

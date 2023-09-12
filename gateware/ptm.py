@@ -266,7 +266,7 @@ class PTMRequester(LiteXModule):
                 If(ptm_sniffer.source.master_time == 0, # FIXME: Add Response/ResponseD indication.
                     NextState("WAIT-1-US")
                 ).Else(
-                    self.ptm_update.eq(1),
+                    NextValue(self.ptm_update, 1),
                     NextValue(self.ptm_master_time, ptm_sniffer.source.master_time),
                     NextValue(self.ptm_propagation_delay, ptm_sniffer.source.propagation_delay),
                     NextState("VALID-PTM-CONTEXT")
@@ -281,6 +281,7 @@ class PTMRequester(LiteXModule):
         )
         fsm.act("VALID-PTM-CONTEXT",
             self.ptm_valid.eq(1),
+            NextValue(self.ptm_update, 0),
             If(self.ptm_trigger,
                 NextState("ISSUE-PTM-REQUEST")
             ),

@@ -154,7 +154,7 @@ class BaseSoC(SoCMini):
 
         # PTM --------------------------------------------------------------------------------------
 
-        from gateware.ptm import PTMSniffer, PTMRequester
+        from gateware.ptm import PTMSniffer, PTMRequester, PTMTimeGenerator
 
         # PTM Sniffer.
         self.ptm_sniffer = PTMSniffer(
@@ -171,19 +171,15 @@ class BaseSoC(SoCMini):
             sys_clk_freq  = sys_clk_freq,
         )
 
-        # PTM Local Time (Updated on PTM Response).
-        ptm_local_time = Signal(64)
-        self.sync += [
-            If(self.ptm_requester.update,
-                ptm_local_time.eq(self.ptm_requester.master_time)
-            ).Else(
-                ptm_local_time.eq(ptm_local_time + 10)
-            )
-        ]
+        # PTM Time Generator.
+        self.ptm_time_generator = PTMTimeGenerator(
+            sys_clk_freq  = sys_clk_freq,
+            ptm_requester = self.ptm_requester,
+        )
 
         # PPS Generator.
         from gateware.pps import PPSGenerator
-        self.pps_generator = PPSGenerator(sys_clk_freq, time=ptm_local_time)
+        self.pps_generator = PPSGenerator(sys_clk_freq, time=self.ptm_time_generator.time)
         self.comb += platform.request("som_led").eq(self.pps_generator.pps)
 
         # Analyzer ---------------------------------------------------------------------------------
@@ -276,7 +272,7 @@ class BaseSoC(SoCMini):
             analyzer_signals = [
                 self.ptm_requester.valid,
                 self.ptm_requester.update,
-                ptm_local_time,
+                self.ptm_time_generator.time,
             ]
             self.analyzer = LiteScopeAnalyzer(analyzer_signals,
                 depth        = 256,

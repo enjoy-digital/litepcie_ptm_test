@@ -17,6 +17,8 @@ from migen import *
 from litex.gen import *
 from litex.gen.genlib.misc import WaitTimer
 
+from litex.build.generic_platform import *
+
 import ocp_tap_timecard_platform as ocp_tap_timecard
 
 from litex.soc.interconnect.csr import *
@@ -80,28 +82,88 @@ class BaseSoC(SoCMini):
             sys_clk_freq = sys_clk_freq
         )
 
-        counter = Signal(32)
-        self.sync += counter.eq(counter + 1)
-        sma0 = platform.request("sma", 0)
-        self.comb += sma0.dat_in_en.eq(1)
-        self.comb += sma0.dat_out_en.eq(0)
-        self.comb += sma0.dat_out.eq(counter[10])
+#        counter = Signal(32)
+#        self.sync += counter.eq(counter + 1)
+#        sma0 = platform.request("sma", 0)
+#        self.comb += sma0.dat_in_en.eq(1)
+#        self.comb += sma0.dat_out_en.eq(0)
+#        self.comb += sma0.dat_out.eq(counter[10])
+#
+#        sma1 = platform.request("sma", 1)
+#        self.comb += sma1.dat_in_en.eq(1)
+#        self.comb += sma1.dat_out_en.eq(0)
+#        self.comb += sma1.dat_out.eq(counter[10])
+#
+#        sma2 = platform.request("sma", 2)
+#        self.comb += sma2.dat_in_en.eq(1)
+#        self.comb += sma2.dat_out_en.eq(0)
+#        self.comb += sma2.dat_out.eq(counter[10])
+#
+#        sma3 = platform.request("sma", 3)
+#        self.comb += sma3.dat_in_en.eq(1)
+#        self.comb += sma3.dat_out_en.eq(0)
+#        self.comb += sma3.dat_out.eq(counter[10])
 
-        sma1 = platform.request("sma", 1)
-        self.comb += sma1.dat_in_en.eq(1)
-        self.comb += sma1.dat_out_en.eq(0)
-        self.comb += sma1.dat_out.eq(counter[10])
+        from litex.soc.cores.uart import RS232PHYTX
 
-        sma2 = platform.request("sma", 2)
-        self.comb += sma2.dat_in_en.eq(1)
-        self.comb += sma2.dat_out_en.eq(0)
-        self.comb += sma2.dat_out.eq(counter[10])
+        class IOStreamer(Module):
+            def __init__(self, identifier, pad, sys_clk_freq, baudrate=115200):
+                assert len(identifier) <= 5
+                for i in range(5-len(identifier)):
+                    identifier += " "
+                assert len(identifier) == 5
+                pads = Record([("tx", 1)])
+                self.comb += pad.eq(pads.tx)
+                phy = RS232PHYTX(pads, int((baudrate/sys_clk_freq)*2**32))
+                self.submodules += phy
 
-        sma3 = platform.request("sma", 3)
-        self.comb += sma3.dat_in_en.eq(1)
-        self.comb += sma3.dat_out_en.eq(0)
-        self.comb += sma3.dat_out.eq(counter[10])
+                fsm = FSM(reset_state="ID0")
+                self.submodules += fsm
+                fsm.act("ID0",
+                    phy.sink.valid.eq(1),
+                    phy.sink.data.eq(ord(identifier[0])),
+                    If(phy.sink.ready,
+                        NextState("ID1")
+                    )
+                )
+                fsm.act("ID1",
+                    phy.sink.valid.eq(1),
+                    phy.sink.data.eq(ord(identifier[1])),
+                    If(phy.sink.ready,
+                        NextState("ID2")
+                    )
+                )
+                fsm.act("ID2",
+                    phy.sink.valid.eq(1),
+                    phy.sink.data.eq(ord(identifier[2])),
+                    If(phy.sink.ready,
+                        NextState("ID3")
+                    )
+                )
+                fsm.act("ID3",
+                    phy.sink.valid.eq(1),
+                    phy.sink.data.eq(ord(identifier[3])),
+                    If(phy.sink.ready,
+                        NextState("ID0")
+                    )
+                )
 
+        ios = [
+            "J16", "F15", "G17", "G18", "G15", "G16", "J19", "H19",
+            "J20", "J21", "G13", "H13", "J15", "H15", "H14", "J14",
+            "K13", "K14", "M13", "L13", "L19", "L20", "K17", "J17",
+            "L16", "K16", "L14", "L15", "M15", "M16"
+        ]
+
+        def create_ios(platform, ios):
+            for io in ios:
+                platform.add_extension([(io, 0, Pins(io), IOStandard("LVCMOS33"))])
+
+        create_ios(platform, ios)
+
+        for io in ios:
+            io_streamer = IOStreamer(io, platform.request(io), sys_clk_freq, baudrate=9600)
+            self.submodules += io_streamer
 
 # Build --------------------------------------------------------------------------------------------
 

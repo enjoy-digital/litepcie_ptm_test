@@ -141,7 +141,7 @@ class PTMCapabilities(LiteXModule):
 
 class PTMSniffer(LiteXModule):
     def __init__(self, rx_rst_n, rx_clk, rx_data, rx_ctrl):
-        self.source = source = stream.Endpoint([("master_time", 64), ("propagation_delay", 32)])
+        self.source = source = stream.Endpoint([("message_code", 8), ("master_time", 64), ("propagation_delay", 32)])
         assert len(rx_data) == 16
         assert len(rx_ctrl) == 2
 
@@ -197,12 +197,13 @@ class PTMSniffer(LiteXModule):
 
         # TLP CDC.
         self.cdc = cdc = stream.ClockDomainCrossing(
-            layout  = [("master_time", 64), ("propagation_delay", 32)],
+            layout  = self.source.description,
             cd_from = "sniffer",
             cd_to   = "sys",
         )
         self.comb += [
             self.tlp_depacketizer.ptm_source.connect(cdc.sink, keep={"valid", "ready", "master_time"}),
+            cdc.sink.message_code.eq(self.tlp_depacketizer.ptm_source.message_code),
             cdc.sink.master_time[ 0:32].eq(self.tlp_depacketizer.ptm_source.master_time[32:64]),
             cdc.sink.master_time[32:64].eq(self.tlp_depacketizer.ptm_source.master_time[ 0:32]),
             cdc.sink.propagation_delay.eq(reverse_bytes(self.tlp_depacketizer.ptm_source.dat[32:64])),
@@ -267,13 +268,15 @@ class PTMRequester(LiteXModule):
         self.comb += ptm_sniffer.source.ready.eq(1)
         fsm.act("WAIT-PTM-RESPONSE",
             If(ptm_sniffer.source.valid,
-                If(ptm_sniffer.source.master_time == 0, # FIXME: Add Response/ResponseD indication.
-                    NextState("WAIT-1-US")
-                ).Else(
-                    NextValue(self.update, 1),
-                    NextValue(self.master_time, ptm_sniffer.source.master_time),
-                    NextValue(self.propagation_delay, ptm_sniffer.source.propagation_delay),
-                    NextState("VALID-PTM-CONTEXT")
+                If(ptm_sniffer.source.message_code == PTM_RESPONSE_MESSAGE_CODE,
+                    If(ptm_sniffer.source.master_time == 0, # FIXME: Add Response/ResponseD indication.
+                        NextState("WAIT-1-US")
+                    ).Else(
+                        NextValue(self.update, 1),
+                        NextValue(self.master_time, ptm_sniffer.source.master_time),
+                        NextValue(self.propagation_delay, ptm_sniffer.source.propagation_delay),
+                        NextState("VALID-PTM-CONTEXT")
+                    )
                 )
             )
         )

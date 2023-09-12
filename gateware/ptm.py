@@ -17,6 +17,12 @@ from gateware.common import *
 
 from litepcie.common import phy_layout
 
+# PTM Constants ------------------------------------------------------------------------------------
+
+PTM_REQUEST_MESSAGE_CODE   = 0b01010010 # PTM Request.
+PTM_RESPONSE_MESSAGE_CODE  = 0b01010011 # PTM Response without timing information.
+PTM_RESPONSED_MESSAGE_CODE = 0b01010011 # PTM Response with timing information.
+
 # PTM Capabilities Constants -----------------------------------------------------------------------
 
 PTM_STRUCTURE_REGS = 3
@@ -202,12 +208,6 @@ class PTMSniffer(LiteXModule):
             cdc.sink.propagation_delay.eq(reverse_bytes(self.tlp_depacketizer.ptm_source.dat[32:64])),
             cdc.source.connect(self.source)
         ]
-
-# PTM Requester/Responder Constants ----------------------------------------------------------------
-
-PTM_REQUEST_MESSAGE_CODE   = 0b01010010 # PTM Request.
-PTM_RESPONSE_MESSAGE_CODE  = 0b01010011 # PTM Response without timing information.
-PTM_RESPONSED_MESSAGE_CODE = 0b01010011 # PTM Response with timing information.
 
 # PTM Requester ------------------------------------------------------------------------------------
 

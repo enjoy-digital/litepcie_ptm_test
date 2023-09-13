@@ -56,7 +56,10 @@ from litepcie.software import generate_litepcie_software
 
 from litescope import LiteScopeAnalyzer
 
+from gateware.pcie_ptm_sniffer import PCIePTMSniffer
+from gateware.ptm import PTMCapabilities, PTMRequester, PTMTimeGenerator
 
+from gateware.pps import PPSGenerator
 
 # CRG ----------------------------------------------------------------------------------------------
 
@@ -83,14 +86,13 @@ class BaseSoC(SoCMini):
         "pcie_msi_table": 4, # Requires fixed mapping for MSI-X.
     }
     def __init__(self, sys_clk_freq=125e6, pcie_address_width=32, pcie_msi_type="msi-x", with_ptm=True,
-        with_jtagbone                = True,
-        with_led_chaser              = True,
-        with_msi_analyzer            = False,
-        with_ptm_conf_analyzer       = False,
-        with_ptm_tlp_analyzer        = False,
-        with_pcie_sniffer_analyzer   = False,
-        with_pcie_requester_analyzer = False,
-        with_pps_analyzer            = True,
+        with_jtagbone                  = True,
+        with_led_chaser                = True,
+        with_msi_analyzer              = False,
+        with_ptm_conf_analyzer         = False,
+        with_pcie_ptm_sniffer_analyzer = False,
+        with_pcie_requester_analyzer   = False,
+        with_pps_analyzer              = True,
         **kwargs):
         platform = ocp_tap_timecard.Platform()
 
@@ -148,28 +150,23 @@ class BaseSoC(SoCMini):
             platform.toolchain.pre_placement_commands.append(f"set_false_path -from [get_clocks {clk0}] -to [get_clocks {clk1}]")
             platform.toolchain.pre_placement_commands.append(f"set_false_path -from [get_clocks {clk1}] -to [get_clocks {clk0}]")
 
-        # PTM capabilities -------------------------------------------------------------------------
+        # PCIe PTM Sniffer -------------------------------------------------------------------------
+        # Since Xilinx PHY does not allow redirecting PTM TLP Messages to the AXI inferface, we sniff
+        # the GTPE2 -> PCIE2 RX Data to re-generate PTM TLP Messages.
 
-        from gateware.ptm import PTMCapabilities
-
-        self.ptm_capabilities = PTMCapabilities(
-            pcie_endpoint     = self.pcie_endpoint,
-            requester_capable = True,
-            responder_capable = True,
-        )
-
-        # PTM --------------------------------------------------------------------------------------
-
-        from gateware.ptm import PTMRequester, PTMTimeGenerator, PTMResponder
-
-        from gateware.pcie_ptm_sniffer import PCIePTMSniffer
-
-        # PTM Sniffer.
         self.pcie_ptm_sniffer = PCIePTMSniffer(
             rx_rst_n = self.pcie_phy.sniffer_rst_n,
             rx_clk   = self.pcie_phy.sniffer_clk,
             rx_data  = self.pcie_phy.sniffer_rx_data,
             rx_ctrl  = self.pcie_phy.sniffer_rx_ctl,
+        )
+
+        # PTM --------------------------------------------------------------------------------------
+
+        # PTM Capabilities.
+        self.ptm_capabilities = PTMCapabilities(
+            pcie_endpoint     = self.pcie_endpoint,
+            requester_capable = True,
         )
 
         # PTM Requester.
@@ -185,19 +182,12 @@ class BaseSoC(SoCMini):
             ptm_requester = self.ptm_requester,
         )
 
-        # PTM Responder.
-        self.ptm_responder = PTMResponder(
-            pcie_endpoint    = self.pcie_endpoint,
-            pcie_ptm_sniffer = self.pcie_ptm_sniffer,
-            sys_clk_freq     = sys_clk_freq,
-        )
+        # PPS --------------------------------------------------------------------------------------
 
-        # PPS Generator.
-        from gateware.pps import PPSGenerator
         self.pps_generator = PPSGenerator(sys_clk_freq, time=self.ptm_time_generator.time)
         self.comb += platform.request("som_led").eq(self.pps_generator.pps)
 
-        # Analyzer ---------------------------------------------------------------------------------
+        # Analyzers --------------------------------------------------------------------------------
 
         if with_msi_analyzer:
             analyzer_signals = [
@@ -218,7 +208,6 @@ class BaseSoC(SoCMini):
             analyzer_signals = [
                 self.ptm_capabilities.conf_ep,
                 self.ptm_capabilities.comp_ep,
-
             ]
             self.analyzer = LiteScopeAnalyzer(analyzer_signals,
                 depth        = 512,
@@ -227,30 +216,7 @@ class BaseSoC(SoCMini):
                 csr_csv      = "analyzer.csv"
             )
 
-        if with_ptm_tlp_analyzer:
-            data_last   = Signal(64)
-            data_change = Signal()
-            self.sync += data_last.eq(self.pcie_phy.source.dat)
-            self.sync += data_change.eq(self.pcie_phy.source.dat != data_last)
-            analyzer_signals = [
-                self.ptm_capabilities.ptm_enable,
-                self.ptm_capabilities.ptm_root_select,
-                self.ptm_capabilities.ptm_effective_granularity,
-                self.ptm_core.req_timer.done,
-                self.ptm_core.fsm,
-                self.pcie_phy.source,
-                self.pcie_phy.sink,
-                self.pcie_phy.cfg_msg_received,
-                data_change,
-            ]
-            self.analyzer = LiteScopeAnalyzer(analyzer_signals,
-                depth        = 512,
-                register     = True,
-                clock_domain = "sys",
-                csr_csv      = "analyzer.csv"
-            )
-
-        if with_pcie_sniffer_analyzer:
+        if with_pcie_ptm_sniffer_analyzer:
             # Analyzer
             analyzer_signals = [
                 self.ptm_requester.ptm_trigger,

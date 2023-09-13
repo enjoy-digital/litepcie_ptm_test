@@ -20,8 +20,8 @@ def test_ptm(enable=1, loops=16):
 
     # Read Master Time received by PTM Requester.
     while loop < loops:
-        r =  f"time (s): {bus.regs.ptm_requester_master_time.read()/1e9:3.2f} "
-        r += f"delay (ns): {bus.regs.ptm_requester_propagation_delay.read():d}"
+        r =  f"time   (s): {bus.regs.ptm_requester_master_time.read()/1e9:3.2f} "
+        r += f"delay (ns): {bus.regs.ptm_requester_link_delay.read():d}"
         print(r)
         loop += 1
         time.sleep(1)

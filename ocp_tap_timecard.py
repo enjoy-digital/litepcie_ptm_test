@@ -238,7 +238,7 @@ class BaseSoC(SoCMini):
                 self.ptm_requester.valid,
                 self.ptm_requester.update,
                 self.ptm_requester.master_time,
-                self.ptm_requester.propagation_delay,
+                self.ptm_requester.link_delay,
             ]
             self.analyzer = LiteScopeAnalyzer(analyzer_signals,
                 depth        = 256,

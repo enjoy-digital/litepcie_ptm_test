@@ -145,10 +145,10 @@ class PTMRequester(LiteXModule):
         self.invalidate = Signal()
 
         # Outputs.
-        self.valid             = Signal()
-        self.update            = Signal()
-        self.master_time       = Signal(64)
-        self.propagation_delay = Signal(32)
+        self.valid       = Signal()
+        self.update      = Signal()
+        self.master_time = Signal(64)
+        self.link_delay  = Signal(32)
 
         # CSRs.
         if with_csr:
@@ -200,7 +200,7 @@ class PTMRequester(LiteXModule):
                     ).Else(
                         NextValue(self.update, 1),
                         NextValue(self.master_time, pcie_ptm_sniffer.source.master_time),
-                        NextValue(self.propagation_delay, pcie_ptm_sniffer.source.propagation_delay),
+                        NextValue(self.link_delay,  pcie_ptm_sniffer.source.link_delay),
                         NextState("VALID-PTM-CONTEXT")
                     )
                 )
@@ -236,8 +236,8 @@ class PTMRequester(LiteXModule):
                 ("``0b1``", "PTM Context Valid."),
             ]),
         ])
-        self._master_time       = CSRStatus(64, description="PTM Master Time (in ns).")
-        self._propagation_delay = CSRStatus(32, description="PTM Propagation Delay (in ns).")
+        self._master_time = CSRStatus(64, description="PTM Master Time (in ns).")
+        self._link_delay  = CSRStatus(32, description="PTM Link Delay (in ns).")
 
         # # #
 
@@ -248,7 +248,7 @@ class PTMRequester(LiteXModule):
             self._status.fields.valid.eq(self.valid),
             # Time.
             self._master_time.status.eq(self.master_time),
-            self._propagation_delay.status.eq(self.propagation_delay),
+            self._link_delay.status.eq(self.link_delay),
         ]
 
         # Trigger. FIXME: Make it configurable.

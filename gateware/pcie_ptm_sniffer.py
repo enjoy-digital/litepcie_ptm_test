@@ -502,7 +502,7 @@ class TLPFilterFormater(LiteXModule):
 
 class PCIePTMSniffer(LiteXModule):
     def __init__(self, rx_rst_n, rx_clk, rx_data, rx_ctrl):
-        self.source = source = stream.Endpoint([("message_code", 8), ("master_time", 64), ("propagation_delay", 32)])
+        self.source = source = stream.Endpoint([("message_code", 8), ("master_time", 64), ("link_delay", 32)])
         assert len(rx_data) == 16
         assert len(rx_ctrl) == 2
 
@@ -560,6 +560,6 @@ class PCIePTMSniffer(LiteXModule):
             cdc.sink.message_code.eq(self.tlp_depacketizer.ptm_source.message_code),
             cdc.sink.master_time[ 0:32].eq(self.tlp_depacketizer.ptm_source.master_time[32:64]),
             cdc.sink.master_time[32:64].eq(self.tlp_depacketizer.ptm_source.master_time[ 0:32]),
-            cdc.sink.propagation_delay.eq(reverse_bytes(self.tlp_depacketizer.ptm_source.dat[32:64])),
+            cdc.sink.link_delay.eq(reverse_bytes(self.tlp_depacketizer.ptm_source.dat[32:64])),
             cdc.source.connect(self.source)
         ]

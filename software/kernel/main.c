@@ -33,6 +33,7 @@
 #include <linux/cdev.h>
 #include <linux/platform_device.h>
 #include <linux/version.h>
+#include <linux/ptp_clock_kernel.h>
 
 #include "litepcie.h"
 #include "csr.h"
@@ -104,6 +105,7 @@ struct litepcie_chan_priv {
 	bool reader;
 	bool writer;
 };
+
 
 static int litepcie_major;
 static int litepcie_minor_idx;
@@ -973,6 +975,44 @@ int compare_revisions(struct revision d1, struct revision d2)
 }
 /* from stackoverflow */
 
+static int litepcie_ptp_gettime(struct ptp_clock_info *ptp, struct timespec64 *ts)
+{
+    // For now we'll return a dummy time (January 1, 2023, 00:00:00)
+    ts->tv_sec = 1672444800; // Represents the number of seconds since January 1, 1970 (UNIX epoch)
+    ts->tv_nsec = 0; // Represents the number of nanoseconds since the last full second
+
+    return 0; // Return success
+}
+
+static int litepcie_ptp_settime(struct ptp_clock_info *ptp, const struct timespec64 *ts)
+{
+    // For now we do nothing in this function and return success
+
+    return 0; // Return success
+}
+
+static int litepcie_ptp_adjtime(struct ptp_clock_info *ptp, s64 delta)
+{
+    // For now we do nothing in this function and return success
+
+    return 0; // Return success
+}
+
+static struct ptp_clock *litepcie_ptp_clock;
+
+static struct ptp_clock_info litepcie_ptp_info = {
+    .owner      = THIS_MODULE,
+    .name       = LITEPCIE_NAME,
+    .max_adj    = 1000000000,
+    .n_alarm    = 0,
+    .n_ext_ts   = 0,
+    .n_per_out  = 0,
+    .pps        = 0,
+    .gettime64  = litepcie_ptp_gettime,
+    .settime64  = litepcie_ptp_settime,
+    .adjtime    = litepcie_ptp_adjtime,
+};
+
 static int litepcie_pci_probe(struct pci_dev *dev, const struct pci_device_id *id)
 {
 	int ret = 0;
@@ -1201,6 +1241,12 @@ static int litepcie_pci_probe(struct pci_dev *dev, const struct pci_device_id *i
 	}
 #endif
 
+	/* PTP */
+	litepcie_ptp_clock = ptp_clock_register(&litepcie_ptp_info, &dev->dev);
+    if (IS_ERR(litepcie_ptp_clock)) {
+        return PTR_ERR(litepcie_ptp_clock);
+    }
+
 	return 0;
 
 fail3:
@@ -1233,6 +1279,8 @@ static void litepcie_pci_remove(struct pci_dev *dev)
 	}
 
 	platform_device_unregister(litepcie_dev->uart);
+
+	ptp_clock_unregister(litepcie_ptp_clock);
 
 	litepcie_free_chdev(litepcie_dev);
 

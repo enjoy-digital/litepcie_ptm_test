@@ -14,7 +14,185 @@ from litex.soc.interconnect import stream
 from litepcie.common import phy_layout
 from litepcie.tlp.common import fmt_type_dict
 
-from gateware.common import COM, EndiannessSwap
+from litepcie.tlp.depacketizer import LitePCIeTLPDepacketizer
+
+# Helpers ------------------------------------------------------------------------------------------
+
+def K(x, y):
+    """K code generator ex: K(28, 5) is COM Symbol"""
+    return (y << 5) | x
+
+def D(x, y):
+    """D code generator"""
+    return (y << 5) | x
+
+# Symbols (6.3.5) ----------------------------------------------------------------------------------
+
+class Symbol:
+    """Symbol definition with name, 8-bit value and description"""
+    def __init__(self, name, value, description=""):
+        self.name        = name
+        self.value       = value
+        self.description = description
+
+SKP =  Symbol("SKP", K(28, 1), "Skip")
+SDP =  Symbol("SDP", K(28, 2), "Start Data Packet")
+EDB =  Symbol("EDB", K(28, 3), "End Bad")
+SUB =  Symbol("SUB", K(28, 4), "Decode Error Substitution")
+COM =  Symbol("COM", K(28, 5), "Comma")
+RSD =  Symbol("RSD", K(28, 6), "Reserved")
+SHP =  Symbol("SHP", K(27, 7), "Start Header Packet")
+END =  Symbol("END", K(29, 7), "End")
+SLC =  Symbol("SLC", K(30, 7), "Start Link Command")
+EPF =  Symbol("EPF", K(23, 7), "End Packet Framing")
+
+symbols = [SKP, SDP, EDB, SUB, COM, RSD, SHP, END, SLC, EPF]
+
+# Endianness Swap ----------------------------------------------------------------------------------
+
+class EndiannessSwap(LiteXModule):
+    """Swap the data bytes/ctrl bits of stream"""
+    def __init__(self, sink, source):
+        assert len(sink.data) == len(source.data)
+        assert len(sink.ctrl) == len(source.ctrl)
+        self.comb += sink.connect(source, omit={"data", "ctrl"})
+        n = len(sink.ctrl)
+        for i in range(n):
+            self.comb += source.data[8*i:8*(i+1)].eq(sink.data[8*(n-1-i):8*(n-1-i+1)])
+            self.comb += source.ctrl[i].eq(sink.ctrl[n-1-i])
+
+# Scrambler Unit (Appendix B) ----------------------------------------------------------------------
+
+@ResetInserter()
+@CEInserter()
+class ScramblerUnit(Module):
+    """Scrambler Unit
+
+    This module generates the scrambled datas for the USB3.0 link (X^16 + X^5 + X^4 + X^3 + 1 polynom).
+    """
+    def __init__(self, reset=0xffff):
+        self.value = Signal(32)
+
+        # # #
+
+        new = Signal(16)
+        cur = Signal(16, reset=reset)
+
+        self.comb += [
+            new[0].eq(cur[0]  ^ cur[6] ^ cur[8]  ^ cur[10]),
+            new[1].eq(cur[1]  ^ cur[7] ^ cur[9]  ^ cur[11]),
+            new[2].eq(cur[2]  ^ cur[8] ^ cur[10] ^ cur[12]),
+            new[3].eq(cur[3]  ^ cur[6] ^ cur[8]  ^ cur[9]  ^ cur[10] ^ cur[11] ^ cur[13]),
+            new[4].eq(cur[4]  ^ cur[6] ^ cur[7]  ^ cur[8]  ^ cur[9]  ^ cur[11] ^ cur[12] ^ cur[14]),
+            new[5].eq(cur[5]  ^ cur[6] ^ cur[7]  ^ cur[9]  ^ cur[12] ^ cur[13] ^ cur[15]),
+            new[6].eq(cur[0]  ^ cur[6] ^ cur[7]  ^ cur[8]  ^ cur[10] ^ cur[13] ^ cur[14]),
+            new[7].eq(cur[1]  ^ cur[7] ^ cur[8]  ^ cur[9]  ^ cur[11] ^ cur[14] ^ cur[15]),
+            new[8].eq(cur[0]  ^ cur[2] ^ cur[8]  ^ cur[9]  ^ cur[10] ^ cur[12] ^ cur[15]),
+            new[9].eq(cur[1]  ^ cur[3] ^ cur[9]  ^ cur[10] ^ cur[11] ^ cur[13]),
+            new[10].eq(cur[0] ^ cur[2] ^ cur[4]  ^ cur[10] ^ cur[11] ^ cur[12] ^ cur[14]),
+            new[11].eq(cur[1] ^ cur[3] ^ cur[5]  ^ cur[11] ^ cur[12] ^ cur[13] ^ cur[15]),
+            new[12].eq(cur[2] ^ cur[4] ^ cur[6]  ^ cur[12] ^ cur[13] ^ cur[14]),
+            new[13].eq(cur[3] ^ cur[5] ^ cur[7]  ^ cur[13] ^ cur[14] ^ cur[15]),
+            new[14].eq(cur[4] ^ cur[6] ^ cur[8]  ^ cur[14] ^ cur[15]),
+            new[15].eq(cur[5] ^ cur[7] ^ cur[9]  ^ cur[15]),
+
+            self.value[0].eq(cur[15]),
+            self.value[1].eq(cur[14]),
+            self.value[2].eq(cur[13]),
+            self.value[3].eq(cur[12]),
+            self.value[4].eq(cur[11]),
+            self.value[5].eq(cur[10]),
+            self.value[6].eq(cur[9]),
+            self.value[7].eq(cur[8]),
+            self.value[8].eq(cur[7]),
+            self.value[9].eq(cur[6]),
+            self.value[10].eq(cur[5]),
+            self.value[11].eq(cur[4]  ^ cur[15]),
+            self.value[12].eq(cur[3]  ^ cur[14] ^ cur[15]),
+            self.value[13].eq(cur[2]  ^ cur[13] ^ cur[14] ^ cur[15]),
+            self.value[14].eq(cur[1]  ^ cur[12] ^ cur[13] ^ cur[14]),
+            self.value[15].eq(cur[0]  ^ cur[11] ^ cur[12] ^ cur[13]),
+            self.value[16].eq(cur[10] ^ cur[11] ^ cur[12] ^ cur[15]),
+            self.value[17].eq(cur[9]  ^ cur[10] ^ cur[11] ^ cur[14]),
+            self.value[18].eq(cur[8]  ^ cur[9]  ^ cur[10] ^ cur[13]),
+            self.value[19].eq(cur[7]  ^ cur[8]  ^ cur[9]  ^ cur[12]),
+            self.value[20].eq(cur[6]  ^ cur[7]  ^ cur[8]  ^ cur[11]),
+            self.value[21].eq(cur[5]  ^ cur[6]  ^ cur[7]  ^ cur[10]),
+            self.value[22].eq(cur[4]  ^ cur[5]  ^ cur[6]  ^ cur[9]  ^ cur[15]),
+            self.value[23].eq(cur[3]  ^ cur[4]  ^ cur[5]  ^ cur[8]  ^ cur[14]),
+            self.value[24].eq(cur[2]  ^ cur[3]  ^ cur[4]  ^ cur[7]  ^ cur[13] ^ cur[15]),
+            self.value[25].eq(cur[1]  ^ cur[2]  ^ cur[3]  ^ cur[6]  ^ cur[12] ^ cur[14]),
+            self.value[26].eq(cur[0]  ^ cur[1]  ^ cur[2]  ^ cur[5]  ^ cur[11] ^ cur[13] ^ cur[15]),
+            self.value[27].eq(cur[0]  ^ cur[1]  ^ cur[4]  ^ cur[10] ^ cur[12] ^ cur[14]),
+            self.value[28].eq(cur[0]  ^ cur[3]  ^ cur[9]  ^ cur[11] ^ cur[13]),
+            self.value[29].eq(cur[2]  ^ cur[8]  ^ cur[10] ^ cur[12]),
+            self.value[30].eq(cur[1]  ^ cur[7]  ^ cur[9]  ^ cur[11]),
+            self.value[31].eq(cur[0]  ^ cur[6]  ^ cur[8]  ^ cur[10]),
+        ]
+        self.sync += cur.eq(new)
+
+# Scrambler (Appendix B) ---------------------------------------------------------------------------
+
+class Scrambler(Module):
+    """Scrambler
+
+    This module scrambles the TX data/ctrl stream. K codes shall not be scrambled.
+    """
+    def __init__(self, reset=0x7dbd):
+        self.enable = Signal(reset=1)
+        self.sink   =   sink = stream.Endpoint([("data", 32), ("ctrl", 4)])
+        self.source = source = stream.Endpoint([("data", 32), ("ctrl", 4)])
+
+        # # #
+
+        self.submodules.unit = unit = ScramblerUnit(reset=reset)
+        self.comb += unit.ce.eq(sink.valid & sink.ready)
+        self.comb += sink.connect(source)
+        for i in range(4):
+            self.comb += [
+                If(~self.enable | sink.ctrl[i], # K codes shall not be scrambled.
+                    source.data[8*i:8*(i+1)].eq(sink.data[8*i:8*(i+1)])
+                ).Else(
+                    source.data[8*i:8*(i+1)].eq(sink.data[8*i:8*(i+1)] ^ unit.value[8*i:8*(i+1)])
+                )
+            ]
+
+# Raw Descrambler (Scrambler + Auto-Synchronization) (Appendix B) ----------------------------------
+
+class RawDescrambler(Module):
+    """Descrambler
+
+    This module descrambles the RX data/ctrl stream. K codes shall not be scrambled. The descrambler
+    automatically synchronizes itself to the incoming stream and resets the scrambler unit when COM
+    characters are seen.
+    """
+    def __init__(self, reset=0xffff):
+        self.enable = Signal(reset=1)
+        self.sink   =   sink = stream.Endpoint([("data", 32), ("ctrl", 4)])
+        self.source = source = stream.Endpoint([("data", 32), ("ctrl", 4)])
+
+        # # #
+
+        scrambler = Scrambler(reset=reset)
+        self.submodules += scrambler
+        self.comb += scrambler.enable.eq(self.enable)
+
+        # Synchronize on COM
+        for i in range(4):
+            self.comb += [
+                If(sink.valid &
+                   sink.ready &
+                   (sink.data[8*i:8*(i+1)] == COM.value) &
+                   sink.ctrl[i],
+                   scrambler.unit.reset.eq(1)
+                )
+            ]
+
+        # Descramble data
+        self.comb += [
+            sink.connect(scrambler.sink),
+            scrambler.source.connect(source)
+        ]
 
 # Raw Word Aligner ---------------------------------------------------------------------------------
 
@@ -319,3 +497,69 @@ class TLPFilterFormater(LiteXModule):
                 NextState("IDLE")
             )
         )
+
+# PCIe PTM Sniffer ---------------------------------------------------------------------------------
+
+class PCIePTMSniffer(LiteXModule):
+    def __init__(self, rx_rst_n, rx_clk, rx_data, rx_ctrl):
+        self.source = source = stream.Endpoint([("message_code", 8), ("master_time", 64), ("propagation_delay", 32)])
+        assert len(rx_data) == 16
+        assert len(rx_ctrl) == 2
+
+        # # #
+
+        # Clocking.
+        self.cd_sniffer = ClockDomain()
+        self.comb += self.cd_sniffer.clk.eq(rx_clk)
+        self.comb += self.cd_sniffer.rst.eq(~rx_rst_n)
+
+        # Raw Sniffing.
+        self.raw_datapath    = ClockDomainsRenamer("sniffer")(RawDatapath(phy_dw=16))
+        self.raw_descrambler = ClockDomainsRenamer("sniffer")(RawDescrambler())
+        self.comb += [
+            self.raw_datapath.sink.valid.eq(1),
+            self.raw_datapath.sink.data.eq(rx_data),
+            self.raw_datapath.sink.ctrl.eq(rx_ctrl),
+            self.raw_datapath.source.connect(self.raw_descrambler.sink),
+        ]
+
+        # TLP Sniffing.
+        self.tlp_aligner         = ClockDomainsRenamer("sniffer")(TLPAligner())
+        self.tlp_endianness_swap = ClockDomainsRenamer("sniffer")(TLPEndiannessSwap())
+        self.tlp_filter_formater = ClockDomainsRenamer("sniffer")(TLPFilterFormater())
+
+        self.submodules += stream.Pipeline(
+            self.raw_descrambler,
+            self.tlp_aligner,
+            self.tlp_endianness_swap,
+            self.tlp_filter_formater,
+        )
+
+        # TLP Depacketizer. FIXME: Direct inject TLPs in LitePCIe through an Arbiter.
+        self.tlp_depacketizer = ClockDomainsRenamer("sniffer")(LitePCIeTLPDepacketizer(
+            data_width   = 64,
+            endianness   = "big",
+            address_mask = 0,
+            capabilities = ["REQUEST", "COMPLETION", "CONFIGURATION", "PTM"],
+        ))
+        self.comb += self.tlp_filter_formater.source.connect(self.tlp_depacketizer.sink)
+        self.comb += [
+            self.tlp_depacketizer.req_source.ready.eq(1),
+            self.tlp_depacketizer.cmp_source.ready.eq(1),
+            self.tlp_depacketizer.conf_source.ready.eq(1),
+        ]
+
+        # TLP CDC.
+        self.cdc = cdc = stream.ClockDomainCrossing(
+            layout  = self.source.description,
+            cd_from = "sniffer",
+            cd_to   = "sys",
+        )
+        self.comb += [
+            self.tlp_depacketizer.ptm_source.connect(cdc.sink, keep={"valid", "ready", "master_time"}),
+            cdc.sink.message_code.eq(self.tlp_depacketizer.ptm_source.message_code),
+            cdc.sink.master_time[ 0:32].eq(self.tlp_depacketizer.ptm_source.master_time[32:64]),
+            cdc.sink.master_time[32:64].eq(self.tlp_depacketizer.ptm_source.master_time[ 0:32]),
+            cdc.sink.propagation_delay.eq(reverse_bytes(self.tlp_depacketizer.ptm_source.dat[32:64])),
+            cdc.source.connect(self.source)
+        ]

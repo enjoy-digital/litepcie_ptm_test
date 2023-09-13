@@ -56,6 +56,8 @@ from litepcie.software import generate_litepcie_software
 
 from litescope import LiteScopeAnalyzer
 
+
+
 # CRG ----------------------------------------------------------------------------------------------
 
 class CRG(LiteXModule):
@@ -158,10 +160,12 @@ class BaseSoC(SoCMini):
 
         # PTM --------------------------------------------------------------------------------------
 
-        from gateware.ptm import PTMSniffer, PTMRequester, PTMTimeGenerator, PTMResponder
+        from gateware.ptm import PTMRequester, PTMTimeGenerator, PTMResponder
+
+        from gateware.pcie_ptm_sniffer import PCIePTMSniffer
 
         # PTM Sniffer.
-        self.ptm_sniffer = PTMSniffer(
+        self.pcie_ptm_sniffer = PCIePTMSniffer(
             rx_rst_n = self.pcie_phy.sniffer_rst_n,
             rx_clk   = self.pcie_phy.sniffer_clk,
             rx_data  = self.pcie_phy.sniffer_rx_data,
@@ -170,9 +174,9 @@ class BaseSoC(SoCMini):
 
         # PTM Requester.
         self.ptm_requester = PTMRequester(
-            pcie_endpoint = self.pcie_endpoint,
-            ptm_sniffer   = self.ptm_sniffer,
-            sys_clk_freq  = sys_clk_freq,
+            pcie_endpoint    = self.pcie_endpoint,
+            pcie_ptm_sniffer = self.pcie_ptm_sniffer,
+            sys_clk_freq     = sys_clk_freq,
         )
 
         # PTM Time Generator.
@@ -183,9 +187,9 @@ class BaseSoC(SoCMini):
 
         # PTM Responder.
         self.ptm_responder = PTMResponder(
-            pcie_endpoint = self.pcie_endpoint,
-            ptm_sniffer   = self.ptm_sniffer,
-            sys_clk_freq  = sys_clk_freq,
+            pcie_endpoint    = self.pcie_endpoint,
+            pcie_ptm_sniffer = self.pcie_ptm_sniffer,
+            sys_clk_freq     = sys_clk_freq,
         )
 
         # PPS Generator.
@@ -250,7 +254,7 @@ class BaseSoC(SoCMini):
             # Analyzer
             analyzer_signals = [
                 self.ptm_requester.ptm_trigger,
-                self.ptm_sniffer.source,
+                self.pcie_ptm_sniffer.source,
             ]
             self.analyzer = LiteScopeAnalyzer(analyzer_signals,
                 depth        = 2048,

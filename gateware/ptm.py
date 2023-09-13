@@ -13,8 +13,6 @@ from litex.gen.genlib.misc import WaitTimer
 from litex.soc.interconnect.csr import *
 from litex.soc.interconnect import stream
 
-from gateware.common import *
-
 from litepcie.common import phy_layout
 
 # PTM Constants ------------------------------------------------------------------------------------
@@ -137,83 +135,10 @@ class PTMCapabilities(LiteXModule):
             self.ptm_effective_granularity.eq((mem_ctrl_port.dat_r >> PTM_CONTROL_EFFECTIVE_GRANULARITY_OFFSET) & 0b1111_1111),
         ]
 
-# PTM Sniffer --------------------------------------------------------------------------------------
-
-class PTMSniffer(LiteXModule):
-    def __init__(self, rx_rst_n, rx_clk, rx_data, rx_ctrl):
-        self.source = source = stream.Endpoint([("message_code", 8), ("master_time", 64), ("propagation_delay", 32)])
-        assert len(rx_data) == 16
-        assert len(rx_ctrl) == 2
-
-        # # #
-
-        # Clocking.
-        self.cd_sniffer = ClockDomain()
-        self.comb += self.cd_sniffer.clk.eq(rx_clk)
-        self.comb += self.cd_sniffer.rst.eq(~rx_rst_n)
-
-        # Raw Sniffing.
-        from gateware.sniffer import RawDatapath
-        from gateware.scrambling import RawDescrambler
-
-        self.raw_datapath    = ClockDomainsRenamer("sniffer")(RawDatapath(phy_dw=16))
-        self.raw_descrambler = ClockDomainsRenamer("sniffer")(RawDescrambler())
-        self.comb += [
-            self.raw_datapath.sink.valid.eq(1),
-            self.raw_datapath.sink.data.eq(rx_data),
-            self.raw_datapath.sink.ctrl.eq(rx_ctrl),
-            self.raw_datapath.source.connect(self.raw_descrambler.sink),
-        ]
-
-        # TLP Sniffing.
-        from gateware.sniffer import TLPAligner, TLPEndiannessSwap, TLPFilterFormater
-
-        self.tlp_aligner         = ClockDomainsRenamer("sniffer")(TLPAligner())
-        self.tlp_endianness_swap = ClockDomainsRenamer("sniffer")(TLPEndiannessSwap())
-        self.tlp_filter_formater = ClockDomainsRenamer("sniffer")(TLPFilterFormater())
-
-        self.submodules += stream.Pipeline(
-            self.raw_descrambler,
-            self.tlp_aligner,
-            self.tlp_endianness_swap,
-            self.tlp_filter_formater,
-        )
-
-        # TLP Depacketizer. FIXME: Direct inject TLPs in LitePCIe through an Arbiter.
-        from litepcie.tlp.depacketizer import LitePCIeTLPDepacketizer
-
-        self.tlp_depacketizer = ClockDomainsRenamer("sniffer")(LitePCIeTLPDepacketizer(
-            data_width   = 64,
-            endianness   = "big",
-            address_mask = 0,
-            capabilities = ["REQUEST", "COMPLETION", "CONFIGURATION", "PTM"],
-        ))
-        self.comb += self.tlp_filter_formater.source.connect(self.tlp_depacketizer.sink)
-        self.comb += [
-            self.tlp_depacketizer.req_source.ready.eq(1),
-            self.tlp_depacketizer.cmp_source.ready.eq(1),
-            self.tlp_depacketizer.conf_source.ready.eq(1),
-        ]
-
-        # TLP CDC.
-        self.cdc = cdc = stream.ClockDomainCrossing(
-            layout  = self.source.description,
-            cd_from = "sniffer",
-            cd_to   = "sys",
-        )
-        self.comb += [
-            self.tlp_depacketizer.ptm_source.connect(cdc.sink, keep={"valid", "ready", "master_time"}),
-            cdc.sink.message_code.eq(self.tlp_depacketizer.ptm_source.message_code),
-            cdc.sink.master_time[ 0:32].eq(self.tlp_depacketizer.ptm_source.master_time[32:64]),
-            cdc.sink.master_time[32:64].eq(self.tlp_depacketizer.ptm_source.master_time[ 0:32]),
-            cdc.sink.propagation_delay.eq(reverse_bytes(self.tlp_depacketizer.ptm_source.dat[32:64])),
-            cdc.source.connect(self.source)
-        ]
-
 # PTM Requester ------------------------------------------------------------------------------------
 
 class PTMRequester(LiteXModule):
-    def __init__(self, pcie_endpoint, ptm_sniffer, sys_clk_freq, with_csr=True):
+    def __init__(self, pcie_endpoint, pcie_ptm_sniffer, sys_clk_freq, with_csr=True):
         # Inputs.
         self.enable     = Signal()
         self.trigger    = Signal()
@@ -235,7 +160,7 @@ class PTMRequester(LiteXModule):
         self.req_ep = req_ep = pcie_endpoint.packetizer.ptm_sink
 
         # PTM Response Endpoint.
-        self.res_ep = res_ep = ptm_sniffer.source
+        self.res_ep = res_ep = pcie_ptm_sniffer.source
 
         # PTM Request Timer.
         self.req_timer = req_timer = WaitTimer(1e-6*sys_clk_freq)
@@ -266,16 +191,16 @@ class PTMRequester(LiteXModule):
                 NextState("WAIT-PTM-RESPONSE")
             )
         )
-        self.comb += ptm_sniffer.source.ready.eq(1)
+        self.comb += pcie_ptm_sniffer.source.ready.eq(1)
         fsm.act("WAIT-PTM-RESPONSE",
-            If(ptm_sniffer.source.valid,
-                If(ptm_sniffer.source.message_code == PTM_RESPONSE_MESSAGE_CODE,
-                    If(ptm_sniffer.source.master_time == 0, # FIXME: Add Response/ResponseD indication.
+            If(pcie_ptm_sniffer.source.valid,
+                If(pcie_ptm_sniffer.source.message_code == PTM_RESPONSE_MESSAGE_CODE,
+                    If(pcie_ptm_sniffer.source.master_time == 0, # FIXME: Add Response/ResponseD indication.
                         NextState("WAIT-1-US")
                     ).Else(
                         NextValue(self.update, 1),
-                        NextValue(self.master_time, ptm_sniffer.source.master_time),
-                        NextValue(self.propagation_delay, ptm_sniffer.source.propagation_delay),
+                        NextValue(self.master_time, pcie_ptm_sniffer.source.master_time),
+                        NextValue(self.propagation_delay, pcie_ptm_sniffer.source.propagation_delay),
                         NextState("VALID-PTM-CONTEXT")
                     )
                 )
@@ -353,7 +278,7 @@ class PTMTimeGenerator(LiteXModule):
 # PTM Responder ------------------------------------------------------------------------------------
 
 class PTMResponder(LiteXModule):
-    def __init__(self, pcie_endpoint, ptm_sniffer, sys_clk_freq, with_csr=True):
+    def __init__(self, pcie_endpoint, pcie_ptm_sniffer, sys_clk_freq, with_csr=True):
         # Inputs.
         self.enable = Signal()
         self.time   = Signal(64)
@@ -376,7 +301,7 @@ class PTMResponder(LiteXModule):
         self.req_ep = req_ep = pcie_endpoint.packetizer.ptm_sink
 
         # PTM Response Endpoint.
-        self.res_ep = res_ep = ptm_sniffer.source
+        self.res_ep = res_ep = pcie_ptm_sniffer.source
 
         # PTM Responder FSM.
         self.fsm = fsm = ResetInserter()(FSM(reset_state="START"))
@@ -388,8 +313,8 @@ class PTMResponder(LiteXModule):
             )
         )
         fsm.act("WAIT-PTM-REQUEST",
-            If(ptm_sniffer.source.valid,
-                If(ptm_sniffer.source.message_code == PTM_REQUEST_MESSAGE_CODE,
+            If(pcie_ptm_sniffer.source.valid,
+                If(pcie_ptm_sniffer.source.message_code == PTM_REQUEST_MESSAGE_CODE,
                     NextValue(t2, self.time),
                     If(self.valid,
                         NextState("ISSUE-PTM-RESPONSED")

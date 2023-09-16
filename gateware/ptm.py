@@ -250,7 +250,7 @@ class PTMRequester(LiteXModule):
             )
         )
 
-    def add_csr(self, sys_clk_freq, default_enable=1):
+    def add_csr(self, sys_clk_freq, default_enable=1, phy_tx_delay=0, phy_rx_delay=0):
         self._control = CSRStorage(fields=[
             CSRField("enable", size=1, offset=0, values=[
                 ("``0b0``", "PTM Requester Disabled."),
@@ -264,10 +264,12 @@ class PTMRequester(LiteXModule):
                 ("``0b1``", "PTM Context Valid."),
             ]),
         ])
-        self._master_time = CSRStatus(64, description="Last PTM Master Time (in ns).")
-        self._link_delay  = CSRStatus(32, description="Last PTM Link Delay (in ns).")
-        self._t1          = CSRStatus(64, description="Last PTM T1 Time (in ns).")
-        self._t4          = CSRStatus(64, description="Last PTM T2 Time (in ns).")
+        self._phy_tx_delay = CSRStatus(32, description="PHY TX logic delay (in ns).")
+        self._phy_rx_delay = CSRStatus(32, description="PHY RX logic delay (in ns).")
+        self._master_time  = CSRStatus(64, description="Last PTM Master Time (in ns).")
+        self._link_delay   = CSRStatus(32, description="Last PTM Link Delay (in ns).")
+        self._t1_time      = CSRStatus(64, description="Last PTM T1 Time (in ns).")
+        self._t4_time      = CSRStatus(64, description="Last PTM T2 Time (in ns).")
 
         # # #
 
@@ -280,8 +282,8 @@ class PTMRequester(LiteXModule):
             # Time.
             self._master_time.status.eq(self.master_time),
             self._link_delay.status.eq(self.link_delay),
-            self._t1.status.eq(self.t1),
-            self._t4.status.eq(self.t4),
+            self._t1_time.status.eq(self.t1),
+            self._t4_time.status.eq(self.t4),
         ]
 
 # PTM Time Generator -------------------------------------------------------------------------------

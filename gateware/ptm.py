@@ -229,6 +229,7 @@ class PTMRequester(LiteXModule):
                 ("``0b0``", "PTM Requester Disabled."),
                 ("``0b1``", "PTM Requester Enabled."),
             ], reset=default_enable),
+            CSRField("trigger", size=1, offset=1, pulse=True),
         ])
         self._status = CSRStatus(fields=[
             CSRField("valid", size=1, offset=0, values=[
@@ -244,17 +245,13 @@ class PTMRequester(LiteXModule):
         self.comb += [
             # Control.
             self.enable.eq(self._control.fields.enable),
+            self.trigger.eq(self._control.fields.trigger),
             # Status.
             self._status.fields.valid.eq(self.valid),
             # Time.
             self._master_time.status.eq(self.master_time),
             self._link_delay.status.eq(self.link_delay),
         ]
-
-        # Trigger. FIXME: Make it configurable.
-        self._trigger = WaitTimer(100e-3*sys_clk_freq)
-        self.comb += self._trigger.wait.eq(~self._trigger.done)
-        self.comb += self.trigger.eq(self._trigger.done)
 
 # PTM Time Generator -------------------------------------------------------------------------------
 

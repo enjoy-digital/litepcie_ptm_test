@@ -149,12 +149,37 @@ class PTMRequester(LiteXModule):
         self.update      = Signal()
         self.master_time = Signal(64)
         self.link_delay  = Signal(32)
+        self.t1          = Signal(64)
+        self.t4          = Signal(64)
+
+        # Time.
+        self.time_clk = Signal()
+        self.time_rst = Signal()
+        self.time     = Signal(64)
 
         # CSRs.
         if with_csr:
             self.add_csr(sys_clk_freq)
 
         # # #
+
+        # Time Clock Domain Crossing.
+        self.cd_time = ClockDomain()
+        self.comb += [
+            self.cd_time.clk.eq(self.time_clk),
+            self.cd_time.rst.eq(self.time_rst),
+        ]
+        time_cdc = stream.ClockDomainCrossing([("time", 64)],
+            cd_from = "time",
+            cd_to   = "sys",
+        )
+        self.submodules += time_cdc
+        self.comb += [
+            time_cdc.sink.valid.eq(1),
+            time_cdc.sink.time.eq(self.time),
+            time_cdc.source.ready.eq(1),
+        ]
+        time = time_cdc.source.time
 
         # PTM Request Endpoint.
         self.req_ep = req_ep = pcie_endpoint.packetizer.ptm_sink
@@ -188,6 +213,7 @@ class PTMRequester(LiteXModule):
             req_ep.requester_id.eq(pcie_endpoint.phy.id),
             req_ep.message_code.eq(PTM_REQUEST_MESSAGE_CODE),
             If(req_ep.ready,
+                NextValue(self.t1, time),
                 NextState("WAIT-PTM-RESPONSE")
             )
         )
@@ -201,6 +227,7 @@ class PTMRequester(LiteXModule):
                         NextValue(self.update, 1),
                         NextValue(self.master_time, pcie_ptm_sniffer.source.master_time),
                         NextValue(self.link_delay,  pcie_ptm_sniffer.source.link_delay),
+                        NextValue(self.t4, time),
                         NextState("VALID-PTM-CONTEXT")
                     )
                 )
@@ -237,8 +264,10 @@ class PTMRequester(LiteXModule):
                 ("``0b1``", "PTM Context Valid."),
             ]),
         ])
-        self._master_time = CSRStatus(64, description="PTM Master Time (in ns).")
-        self._link_delay  = CSRStatus(32, description="PTM Link Delay (in ns).")
+        self._master_time = CSRStatus(64, description="Last PTM Master Time (in ns).")
+        self._link_delay  = CSRStatus(32, description="Last PTM Link Delay (in ns).")
+        self._t1          = CSRStatus(64, description="Last PTM T1 Time (in ns).")
+        self._t4          = CSRStatus(64, description="Last PTM T2 Time (in ns).")
 
         # # #
 
@@ -251,6 +280,8 @@ class PTMRequester(LiteXModule):
             # Time.
             self._master_time.status.eq(self.master_time),
             self._link_delay.status.eq(self.link_delay),
+            self._t1.status.eq(self.t1),
+            self._t4.status.eq(self.t4),
         ]
 
 # PTM Time Generator -------------------------------------------------------------------------------

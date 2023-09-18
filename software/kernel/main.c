@@ -98,6 +98,10 @@ struct litepcie_device {
 	int minor_base;
 	int irqs;
 	int channels;
+	/* System time value lock */
+	spinlock_t tmreg_lock;
+	struct system_time_snapshot snapshot;
+	struct ptp_clock_info ptp_caps;
 };
 
 struct litepcie_chan_priv {
@@ -975,42 +979,120 @@ int compare_revisions(struct revision d1, struct revision d2)
 }
 /* from stackoverflow */
 
-static int litepcie_ptp_gettime(struct ptp_clock_info *ptp, struct timespec64 *ts)
-{
-    // For now we'll return a dummy time (January 1, 2023, 00:00:00)
-    ts->tv_sec = 1672444800; // Represents the number of seconds since January 1, 1970 (UNIX epoch)
-    ts->tv_nsec = 0; // Represents the number of nanoseconds since the last full second
+/* time */
+#define LITEPCIE_PTP_SYSTIML 0x0
+#define LITEPCIE_PTP_SYSTIMH 0x01
 
-    return 0; // Return success
+/* PTM */
+#define LITEPCIE_PTM_TIM_H 0x02
+#define LITEPCIE_PTM_TIM_L 0x02
+#define LITEPCIE_PTM_T2_H  0x03
+#define LITEPCIE_PTM_T2_L  0x04
+
+static int litepcie_ptp_gettimex64(struct ptp_clock_info *ptp,
+                   struct timespec64 *ts,
+                   struct ptp_system_timestamp *sts)
+{
+	struct litepcie_device *dev = container_of(ptp, struct litepcie_device,
+							   ptp_caps);
+	unsigned long flags;
+
+	spin_lock_irqsave(&dev->tmreg_lock, flags);
+
+	ptp_read_system_prets(sts);
+	ts->tv_nsec = litepcie_readl(dev, LITEPCIE_PTP_SYSTIML);
+	ts->tv_sec = litepcie_readl(dev, LITEPCIE_PTP_SYSTIMH);
+	ptp_read_system_postts(sts);
+
+	spin_unlock_irqrestore(&dev->tmreg_lock, flags);
+
+	return 0;
 }
 
 static int litepcie_ptp_settime(struct ptp_clock_info *ptp, const struct timespec64 *ts)
 {
-    // For now we do nothing in this function and return success
+	struct litepcie_device *dev = container_of(ptp, struct litepcie_device,
+							   ptp_caps);
+	unsigned long flags;
 
-    return 0; // Return success
+	spin_lock_irqsave(&dev->tmreg_lock, flags);
+
+	litepcie_writel(dev, LITEPCIE_PTP_SYSTIML, ts->tv_sec);
+	litepcie_writel(dev, LITEPCIE_PTP_SYSTIMH, ts->tv_nsec);
+
+	spin_unlock_irqrestore(&dev->tmreg_lock, flags);
+
+	return 0; // Return success
 }
 
 static int litepcie_ptp_adjtime(struct ptp_clock_info *ptp, s64 delta)
 {
-    // For now we do nothing in this function and return success
+	struct litepcie_device *dev = container_of(ptp, struct litepcie_device,
+							   ptp_caps);
+	struct timespec64 now, then = ns_to_timespec64(delta);
+	unsigned long flags;
 
-    return 0; // Return success
+	spin_lock_irqsave(&dev->tmreg_lock, flags);
+
+	now.tv_nsec = litepcie_readl(dev, LITEPCIE_PTP_SYSTIML);
+	now.tv_sec = litepcie_readl(dev, LITEPCIE_PTP_SYSTIMH);
+	now = timespec64_add(now, then);
+	litepcie_writel(dev, LITEPCIE_PTP_SYSTIML, now.tv_sec);
+	litepcie_writel(dev, LITEPCIE_PTP_SYSTIMH, now.tv_nsec);
+
+	spin_unlock_irqrestore(&dev->tmreg_lock, flags);
+
+	return 0; // Return success
+}
+
+static int litepcie_phc_get_syncdevicetime(ktime_t *device,
+                      struct system_counterval_t *system,
+                      void *ctx)
+{
+	u32 t2_curr_h, t2_curr_l;
+	struct litepcie_device *dev = ctx;
+	ktime_t t1, t2_curr;
+
+	/* Get a snapshot of system clocks to use as historic value. */
+	ktime_get_snapshot(&dev->snapshot);
+
+	t1 = ktime_set(litepcie_readl(dev, LITEPCIE_PTM_TIM_H),
+			litepcie_readl(dev, LITEPCIE_PTM_TIM_L));
+
+	t2_curr_l = litepcie_readl(dev, LITEPCIE_PTM_T2_L);
+	t2_curr_h = litepcie_readl(dev, LITEPCIE_PTM_T2_H);
+	t2_curr = ((s64)t2_curr_h << 32 | t2_curr_l);
+
+	*device = t1;
+	*system = convert_art_ns_to_tsc(t2_curr);
+
+	return 0;
+}
+
+static int litepcie_ptp_getcrosststamp(struct ptp_clock_info *ptp,
+                  struct system_device_crosststamp *cts)
+{
+	struct litepcie_device *dev= container_of(ptp, struct litepcie_device,
+                           ptp_caps);
+
+	return get_device_system_crosststamp(litepcie_phc_get_syncdevicetime,
+                         dev, &dev->snapshot, cts);
 }
 
 static struct ptp_clock *litepcie_ptp_clock;
 
 static struct ptp_clock_info litepcie_ptp_info = {
-    .owner      = THIS_MODULE,
-    .name       = LITEPCIE_NAME,
-    .max_adj    = 1000000000,
-    .n_alarm    = 0,
-    .n_ext_ts   = 0,
-    .n_per_out  = 0,
-    .pps        = 0,
-    .gettime64  = litepcie_ptp_gettime,
-    .settime64  = litepcie_ptp_settime,
-    .adjtime    = litepcie_ptp_adjtime,
+	.owner          = THIS_MODULE,
+	.name           = LITEPCIE_NAME,
+	.max_adj        = 1000000000,
+	.n_alarm        = 0,
+	.n_ext_ts       = 0,
+	.n_per_out      = 0,
+	.pps            = 0,
+	.gettimex64     = litepcie_ptp_gettimex64,
+	.settime64      = litepcie_ptp_settime,
+	.adjtime        = litepcie_ptp_adjtime,
+	.getcrosststamp = litepcie_ptp_getcrosststamp,
 };
 
 static int litepcie_pci_probe(struct pci_dev *dev, const struct pci_device_id *id)
@@ -1242,10 +1324,13 @@ static int litepcie_pci_probe(struct pci_dev *dev, const struct pci_device_id *i
 #endif
 
 	/* PTP */
+	litepcie_dev->ptp_caps = litepcie_ptp_info;
 	litepcie_ptp_clock = ptp_clock_register(&litepcie_ptp_info, &dev->dev);
     if (IS_ERR(litepcie_ptp_clock)) {
         return PTR_ERR(litepcie_ptp_clock);
     }
+
+	spin_lock_init(&litepcie_dev->tmreg_lock);
 
 	return 0;
 

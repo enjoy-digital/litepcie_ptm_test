@@ -285,22 +285,3 @@ class PTMRequester(LiteXModule):
             self._t1_time.status.eq(self.t1),
             self._t4_time.status.eq(self.t4),
         ]
-
-# PTM Time Generator -------------------------------------------------------------------------------
-
-class PTMTimeGenerator(LiteXModule):
-    def __init__(self, sys_clk_freq, ptm_requester):
-        assert 1e9/sys_clk_freq == int(1e9/sys_clk_freq)
-        self.time = time = Signal(64)
-
-        # # #
-
-        self.sync += [
-            # On PTM Requester update, override time with master_time.
-            If(ptm_requester.update,
-                time.eq(ptm_requester.master_time)
-            # Else increment time on each cycle with 1ns granularity.
-            ).Else(
-                time.eq(time + int(1e9/sys_clk_freq))
-            )
-        ]

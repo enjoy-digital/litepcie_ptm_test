@@ -57,25 +57,25 @@ from litepcie.software import generate_litepcie_software
 from litescope import LiteScopeAnalyzer
 
 from gateware.pcie_ptm_sniffer import PCIePTMSniffer
-from gateware.ptm import PTMCapabilities, PTMRequester, PTMTimeGenerator
-
+from gateware.time import TimeGenerator
+from gateware.ptm import PTMCapabilities, PTMRequester
 from gateware.pps import PPSGenerator
 
 # CRG ----------------------------------------------------------------------------------------------
 
 class CRG(LiteXModule):
     def __init__(self, platform, sys_clk_freq):
-        #self.rst          = Signal()
-        self.cd_sys       = ClockDomain()
+        self.cd_sys   = ClockDomain()
+        self.cd_clk50 = ClockDomain()
 
         # Clk/Rst
         clk200 = platform.request("clk200")
 
         # PLL
         self.pll = pll = S7PLL()
-        #self.comb += pll.reset.eq(self.rst)
         pll.register_clkin(clk200, 200e6)
-        pll.create_clkout(self.cd_sys, sys_clk_freq)
+        pll.create_clkout(self.cd_sys,   sys_clk_freq, margin=0)
+        pll.create_clkout(self.cd_clk50, 50e6,         margin=0)
         platform.add_false_path_constraints(self.cd_sys.clk, pll.clkin) # Ignore sys_clk to pll.clkin path created by SoC's rst.
 
 # BaseSoC -----------------------------------------------------------------------------------------
@@ -160,6 +160,12 @@ class BaseSoC(SoCMini):
             rx_data  = self.pcie_phy.sniffer_rx_data,
             rx_ctrl  = self.pcie_phy.sniffer_rx_ctl,
         )
+        # Time -------------------------------------------------------------------------------------
+
+        self.time_generator = TimeGenerator(
+            clk_domain = "clk50",
+            clk_freq   = 50e6
+        )
 
         # PTM --------------------------------------------------------------------------------------
 
@@ -175,6 +181,11 @@ class BaseSoC(SoCMini):
             pcie_ptm_sniffer = self.pcie_ptm_sniffer,
             sys_clk_freq     = sys_clk_freq,
         )
+        self.comb += [
+            self.ptm_requester.time_clk.eq(ClockSignal("clk50")),
+            self.ptm_requester.time_rst.eq(ResetSignal("clk50")),
+            self.ptm_requester.time.eq(self.time_generator.time)
+        ]
 
         # Analyzers --------------------------------------------------------------------------------
 

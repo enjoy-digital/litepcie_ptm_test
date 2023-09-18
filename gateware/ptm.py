@@ -264,8 +264,8 @@ class PTMRequester(LiteXModule):
                 ("``0b1``", "PTM Context Valid."),
             ]),
         ])
-        self._phy_tx_delay = CSRStatus(32, description="PHY TX logic delay (in ns).")
-        self._phy_rx_delay = CSRStatus(32, description="PHY RX logic delay (in ns).")
+        self._phy_tx_delay = CSRStatus(32, reset=phy_tx_delay, description="PHY TX logic delay (in ns).")
+        self._phy_rx_delay = CSRStatus(32, reset=phy_rx_delay, description="PHY RX logic delay (in ns).")
         self._master_time  = CSRStatus(64, description="Last PTM Master Time (in ns).")
         self._link_delay   = CSRStatus(32, description="Last PTM Link Delay (in ns).")
         self._t1_time      = CSRStatus(64, description="Last PTM T1 Time (in ns).")

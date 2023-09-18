@@ -5,6 +5,11 @@ import argparse
 
 from litex import RemoteClient
 
+# Constants ----------------------------------------------------------------------------------------
+
+PTM_CONTROL_ENABLE  = (1 << 0)
+PTM_CONTROL_TRIGGER = (1 << 1)
+
 # Test ---------------------------------------------------------------------------------------------
 
 def test_ptm(enable=1, loops=16):
@@ -15,15 +20,20 @@ def test_ptm(enable=1, loops=16):
     # Parameters.
     loop = 0
 
-    # Configure PTM Requester.
-    bus.regs.ptm_requester_control.write(enable)
+    # Configure PTM Requester and initiate 2 Requests.
+    bus.regs.ptm_requester_control.write(enable * PTM_CONTROL_ENABLE | PTM_CONTROL_TRIGGER)
+    bus.regs.ptm_requester_control.write(enable * PTM_CONTROL_ENABLE | PTM_CONTROL_TRIGGER)
 
     # Read Master Time received by PTM Requester.
     while loop < loops:
-        r =  f"time   (s): {bus.regs.ptm_requester_master_time.read()/1e9:3.2f} "
-        r += f"delay (ns): {bus.regs.ptm_requester_link_delay.read():d}"
+        r =  f"valid : {bus.regs.ptm_requester_status.read()} "
+        r += f"master_time  (s): {bus.regs.ptm_requester_master_time.read()/1e9:3.2f} "
+        r += f"link_delay  (ns): {bus.regs.ptm_requester_link_delay.read():d} "
+        r += f"t1_time     (s): {bus.regs.ptm_requester_t1_time.read()/1e9:3.2f} "
+        r += f"t4_time     (s): {bus.regs.ptm_requester_t4_time.read()/1e9:3.2f} "
         print(r)
         loop += 1
+        bus.regs.ptm_requester_control.write(enable * PTM_CONTROL_ENABLE | PTM_CONTROL_TRIGGER)
         time.sleep(1)
 
     # Close Bus.

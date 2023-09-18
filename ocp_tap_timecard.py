@@ -92,7 +92,7 @@ class BaseSoC(SoCMini):
         with_ptm_conf_analyzer         = False,
         with_pcie_ptm_sniffer_analyzer = False,
         with_pcie_requester_analyzer   = False,
-        with_pps_analyzer              = True,
+        with_pps_analyzer              = False,
         **kwargs):
         platform = ocp_tap_timecard.Platform()
 
@@ -176,17 +176,6 @@ class BaseSoC(SoCMini):
             sys_clk_freq     = sys_clk_freq,
         )
 
-        # PTM Time Generator.
-        self.ptm_time_generator = PTMTimeGenerator(
-            sys_clk_freq  = sys_clk_freq,
-            ptm_requester = self.ptm_requester,
-        )
-
-        # PPS --------------------------------------------------------------------------------------
-
-        self.pps_generator = PPSGenerator(sys_clk_freq, time=self.ptm_time_generator.time)
-        self.comb += platform.request("som_led").eq(self.pps_generator.pps)
-
         # Analyzers --------------------------------------------------------------------------------
 
         if with_msi_analyzer:
@@ -253,7 +242,7 @@ class BaseSoC(SoCMini):
             analyzer_signals = [
                 self.ptm_requester.valid,
                 self.ptm_requester.update,
-                self.ptm_time_generator.time,
+                #self.ptm_time_generator.time,
             ]
             self.analyzer = LiteScopeAnalyzer(analyzer_signals,
                 depth        = 256,

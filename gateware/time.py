@@ -70,7 +70,7 @@ class TimeController(LiteXModule):
                 time_ns.eq(time_ns + int(1e9/clk_freq)),
                 If(time_ns >= (int(1e9) - int(1e9/clk_freq)),
                     time_ns.eq(0),
-                    time_s.eq(time_s + int(1e9/clk_freq))
+                    time_s.eq(time_s + 1)
                 )
             )
         ]

@@ -1105,6 +1105,7 @@ static int litepcie_phc_get_syncdevicetime(ktime_t *device,
                       struct system_counterval_t *system,
                       void *ctx)
 {
+	u32 t1_curr_h, t1_curr_l;
 	u32 t2_curr_h, t2_curr_l;
 	u32 reg;
 	struct litepcie_device *dev = ctx;
@@ -1131,11 +1132,15 @@ static int litepcie_phc_get_syncdevicetime(ktime_t *device,
 		return -ETIMEDOUT;
 	}
 
-#if 0
+#if 1
 	t1_curr_l = litepcie_readl(dev, PTM_T1_TIME_L);
 	t1_curr_h = litepcie_readl(dev, PTM_T1_TIME_H);
+#if 1
+	t1 = ktime_set(t1_curr_h, t1_curr_l);
+#else
 	t1_curr = ((u64)t1_curr_h << 32 | t1_curr_l);
 	t1 = ns_to_ktime(t1_curr);
+#endif
 #else
 	litepcie_read_time(dev, &ts);
 	t1 = ktime_set(ts.tv_sec, ts.tv_nsec);

@@ -990,11 +990,11 @@ int compare_revisions(struct revision d1, struct revision d2)
 #define PTM_CONTROL_TRIGGER (1 << CSR_PTM_REQUESTER_CONTROL_TRIGGER_OFFSET)
 #define PTM_STATUS_VALID    (1 << CSR_PTM_REQUESTER_STATUS_VALID_OFFSET)
 /* t1 */
-#define PTM_MASTER_T1_L     (CSR_PTM_REQUESTER_T1_TIME_ADDR)
-#define PTM_MASTER_T1_H     (CSR_PTM_REQUESTER_T1_TIME_ADDR + (1 << 2))
+#define PTM_T1_TIME_L       (CSR_PTM_REQUESTER_T1_TIME_ADDR + (4))
+#define PTM_T1_TIME_H       (CSR_PTM_REQUESTER_T1_TIME_ADDR + (0))
 /* t2 */
-#define PTM_MASTER_TIME_L   (CSR_PTM_REQUESTER_MASTER_TIME_ADDR)
-#define PTM_MASTER_TIME_H   (CSR_PTM_REQUESTER_MASTER_TIME_ADDR + (1 << 2))
+#define PTM_MASTER_TIME_L   (CSR_PTM_REQUESTER_MASTER_TIME_ADDR + (4))
+#define PTM_MASTER_TIME_H   (CSR_PTM_REQUESTER_MASTER_TIME_ADDR + (0))
 
 static int litepcie_read_time(struct litepcie_device *dev, struct timespec64 *ts)
 {
@@ -1056,11 +1056,10 @@ static int litepcie_ptp_settime(struct ptp_clock_info *ptp, const struct timespe
 
 static int litepcie_ptp_adjfine(struct ptp_clock_info *ptp, long scaled_ppm)
 {
-	if (scaled_ppm == 0)
-		return 0;
-
-	return -EOPNOTSUPP;
-#if 0
+#if 1
+	if (scaled_ppm != 0)
+		return -EOPNOTSUPP;
+#else
 	struct litepcie_device *dev = container_of(ptp, struct litepcie_device,
 							   ptp_caps);
     int neg_adj = 0;
@@ -1087,7 +1086,6 @@ static int litepcie_ptp_adjfine(struct ptp_clock_info *ptp, long scaled_ppm)
 
 static int litepcie_ptp_adjtime(struct ptp_clock_info *ptp, s64 delta)
 {
-#if 0
 	struct litepcie_device *dev = container_of(ptp, struct litepcie_device,
 							   ptp_caps);
 	struct timespec64 now, then = ns_to_timespec64(delta);
@@ -1100,7 +1098,6 @@ static int litepcie_ptp_adjtime(struct ptp_clock_info *ptp, s64 delta)
 	litepcie_write_time(dev, &now);
 
 	spin_unlock_irqrestore(&dev->tmreg_lock, flags);
-#endif
 	return 0; // Return success
 }
 
@@ -1108,27 +1105,25 @@ static int litepcie_phc_get_syncdevicetime(ktime_t *device,
                       struct system_counterval_t *system,
                       void *ctx)
 {
-	u32 t1_curr_h, t1_curr_l;
 	u32 t2_curr_h, t2_curr_l;
-	u64 t1_curr;
+	u32 reg;
 	struct litepcie_device *dev = ctx;
 	ktime_t t1, t2_curr;
 	int count = 100;
+	struct timespec64 ts;
 
 	/* Get a snapshot of system clocks to use as historic value. */
 	ktime_get_snapshot(&dev->snapshot);
 
 	/* request */
 
-	litepcie_writel(dev, CSR_TIME_CONTROLLER_CONTROL_ADDR,
+	litepcie_writel(dev, CSR_PTM_REQUESTER_CONTROL_ADDR,
 		PTM_CONTROL_ENABLE | PTM_CONTROL_TRIGGER);
-	litepcie_writel(dev, CSR_TIME_CONTROLLER_CONTROL_ADDR,
-		PTM_CONTROL_ENABLE | PTM_CONTROL_TRIGGER);
-
 	/* wait until valid */
 	do {
-	if ((litepcie_readl(dev, CSR_PTM_REQUESTER_STATUS_ADDR) & PTM_STATUS_VALID) == 0)
-		break;
+		reg = litepcie_readl(dev, CSR_PTM_REQUESTER_STATUS_ADDR);
+		if ((reg & PTM_STATUS_VALID) != 0)
+			break;
 	}while (--count);
 
 	if (!count) {
@@ -1136,17 +1131,27 @@ static int litepcie_phc_get_syncdevicetime(ktime_t *device,
 		return -ETIMEDOUT;
 	}
 
-	t1_curr_l = litepcie_readl(dev, PTM_MASTER_TIME_L);
-	t1_curr_h = litepcie_readl(dev, PTM_MASTER_TIME_H);
-	t1_curr = ((s64)t1_curr_h << 32 | t1_curr_l);
+#if 0
+	t1_curr_l = litepcie_readl(dev, PTM_T1_TIME_L);
+	t1_curr_h = litepcie_readl(dev, PTM_T1_TIME_H);
+	t1_curr = ((u64)t1_curr_h << 32 | t1_curr_l);
 	t1 = ns_to_ktime(t1_curr);
+#else
+	litepcie_read_time(dev, &ts);
+	t1 = ktime_set(ts.tv_sec, ts.tv_nsec);
+#endif
 
 	t2_curr_l = litepcie_readl(dev, PTM_MASTER_TIME_L);
 	t2_curr_h = litepcie_readl(dev, PTM_MASTER_TIME_H);
-	t2_curr = ((s64)t2_curr_h << 32 | t2_curr_l);
+	t2_curr = ((u64)t2_curr_h << 32 | t2_curr_l);
 
 	*device = t1;
+#if IS_ENABLED(CONFIG_X86_TSC) && !defined(CONFIG_UML)
 	*system = convert_art_ns_to_tsc(t2_curr);
+#else
+    *system (struct system_counterval_t) { };
+#endif
+
 
 	return 0;
 }
@@ -1423,7 +1428,8 @@ static int litepcie_pci_probe(struct pci_dev *dev, const struct pci_device_id *i
 	/* enable timer (time) counter */
 	litepcie_writel(litepcie_dev, CSR_TIME_CONTROLLER_CONTROL_ADDR, TIME_CONTROL_ENABLE);
 
-	litepcie_writel(litepcie_dev, CSR_PTM_REQUESTER_CONTROL_ADDR, PTM_CONTROL_ENABLE);
+	litepcie_writel(litepcie_dev, CSR_PTM_REQUESTER_CONTROL_ADDR, PTM_CONTROL_ENABLE | PTM_CONTROL_TRIGGER);
+	litepcie_writel(litepcie_dev, CSR_PTM_REQUESTER_CONTROL_ADDR, PTM_CONTROL_ENABLE | PTM_CONTROL_TRIGGER);
 
 	spin_lock_init(&litepcie_dev->tmreg_lock);
 

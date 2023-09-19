@@ -189,7 +189,9 @@ class BaseSoC(SoCMini):
         self.comb += [
             self.ptm_requester.time_clk.eq(ClockSignal("clk50")),
             self.ptm_requester.time_rst.eq(ResetSignal("clk50")),
-            self.ptm_requester.time.eq(self.time_generator.time)
+            #self.ptm_requester.time.eq(self.time_generator.time)
+            self.ptm_requester.time[0 :32].eq(self.time_controller.time_ns),
+            self.ptm_requester.time[32:64].eq(self.time_controller.time_s),
         ]
 
         # Analyzers --------------------------------------------------------------------------------

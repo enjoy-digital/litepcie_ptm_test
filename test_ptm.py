@@ -9,6 +9,8 @@ from litex import RemoteClient
 
 PTM_CONTROL_ENABLE  = (1 << 0)
 PTM_CONTROL_TRIGGER = (1 << 1)
+PTM_STATUS_VALID    = (1 << 0)
+PTM_STATUS_BUSY     = (1 << 1)
 
 # Test ---------------------------------------------------------------------------------------------
 
@@ -23,10 +25,12 @@ def test_ptm(enable=1, loops=16):
     # Configure PTM Requester and initiate 2 Requests.
     bus.regs.ptm_requester_control.write(enable * PTM_CONTROL_ENABLE | PTM_CONTROL_TRIGGER)
     bus.regs.ptm_requester_control.write(enable * PTM_CONTROL_ENABLE | PTM_CONTROL_TRIGGER)
+    while (bus.regs.ptm_requester_status.read() & PTM_STATUS_BUSY):
+        pass
 
     # Read Master Time received by PTM Requester.
     while loop < loops:
-        r =  f"valid : {bus.regs.ptm_requester_status.read()} "
+        r =  f"valid : {bus.regs.ptm_requester_status.read() & PTM_STATUS_VALID} "
         r += f"master_time  (s): {bus.regs.ptm_requester_master_time.read()/1e9:3.2f} "
         r += f"link_delay  (ns): {bus.regs.ptm_requester_link_delay.read():d} "
         r += f"t1_time     (s): {bus.regs.ptm_requester_t1_time.read()/1e9:3.2f} "
@@ -34,6 +38,8 @@ def test_ptm(enable=1, loops=16):
         print(r)
         loop += 1
         bus.regs.ptm_requester_control.write(enable * PTM_CONTROL_ENABLE | PTM_CONTROL_TRIGGER)
+        while (bus.regs.ptm_requester_status.read() & PTM_STATUS_BUSY):
+            pass
         time.sleep(1)
 
     # Close Bus.

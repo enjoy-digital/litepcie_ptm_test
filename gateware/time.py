@@ -52,7 +52,7 @@ class TimeController(LiteXModule):
         self.cd_time = ClockDomain()
         self.comb += [
             self.cd_time.clk.eq(ClockSignal(clk_domain)),
-            self.cd_time.rst.eq(ResetSignal(clk_domain)),
+            self.cd_time.rst.eq(0 if (clk_domain == "sys") else ResetSignal(clk_domain)),
         ]
 
         # Time Handling.
@@ -118,3 +118,16 @@ class TimeController(LiteXModule):
         self.submodules += time_override_ps
         self.comb += time_override_ps.i.eq(self._control.fields.override)
         self.comb += self.override.eq(time_override_ps.o)
+
+# Test ---------------------------------------------------------------------------------------------
+
+if __name__ == "__main__":
+
+    dut = TimeController(clk_domain="sys", clk_freq=1e3, with_csr=False)
+    def generator(dut):
+        yield dut.enable.eq(1)
+        yield dut.override.eq(0)
+        while (yield dut.time_s) != 4:
+            yield
+    clocks = {"sys": 1e3, "time": 1e3}
+    run_simulation(dut, generator(dut), clocks, vcd_name="sim.vcd")

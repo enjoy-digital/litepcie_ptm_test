@@ -146,6 +146,7 @@ class PTMRequester(LiteXModule):
 
         # Outputs.
         self.valid       = Signal()
+        self.busy        = Signal()
         self.update      = Signal()
         self.master_time = Signal(64)
         self.link_delay  = Signal(32)
@@ -204,6 +205,7 @@ class PTMRequester(LiteXModule):
             )
         )
         fsm.act("ISSUE-PTM-REQUEST",
+            self.busy.eq(1),
             req_ep.valid.eq(1),
             req_ep.request.eq(1),
             req_ep.response.eq(0),
@@ -219,6 +221,7 @@ class PTMRequester(LiteXModule):
         )
         self.comb += pcie_ptm_sniffer.source.ready.eq(1)
         fsm.act("WAIT-PTM-RESPONSE",
+            self.busy.eq(1),
             If(pcie_ptm_sniffer.source.valid,
                 If(pcie_ptm_sniffer.source.message_code == PTM_RESPONSE_MESSAGE_CODE,
                     If(pcie_ptm_sniffer.source.master_time == 0, # FIXME: Add Response/ResponseD indication.
@@ -263,6 +266,11 @@ class PTMRequester(LiteXModule):
                 ("``0b0``", "PTM Context Invalid."),
                 ("``0b1``", "PTM Context Valid."),
             ]),
+            CSRField("busy", size=1, offset=1, values=[
+                ("``0b0``", "PTM Request Done."),
+                ("``0b1``", "PTM Request Ongoing."),
+            ]),
+
         ])
         self._phy_tx_delay = CSRStatus(32, reset=phy_tx_delay, description="PHY TX logic delay (in ns).")
         self._phy_rx_delay = CSRStatus(32, reset=phy_rx_delay, description="PHY RX logic delay (in ns).")
@@ -279,6 +287,7 @@ class PTMRequester(LiteXModule):
             self.trigger.eq(self._control.fields.trigger),
             # Status.
             self._status.fields.valid.eq(self.valid),
+            self._status.fields.busy.eq(self.busy),
             # Time.
             self._master_time.status.eq(self.master_time),
             self._link_delay.status.eq(self.link_delay),

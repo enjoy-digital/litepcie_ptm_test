@@ -64,7 +64,7 @@ from gateware.pps import PPSGenerator
 # CRG ----------------------------------------------------------------------------------------------
 
 class CRG(LiteXModule):
-    def __init__(self, platform, sys_clk_freq):
+    def __init__(self, platform, sys_clk_freq, use_clk10=False):
         self.cd_sys   = ClockDomain()
         self.cd_clk50 = ClockDomain()
 
@@ -75,8 +75,20 @@ class CRG(LiteXModule):
         self.pll = pll = S7PLL()
         pll.register_clkin(clk200, 200e6)
         pll.create_clkout(self.cd_sys,   sys_clk_freq, margin=0)
-        pll.create_clkout(self.cd_clk50, 50e6,         margin=0)
         platform.add_false_path_constraints(self.cd_sys.clk, pll.clkin) # Ignore sys_clk to pll.clkin path created by SoC's rst.
+
+
+        if use_clk10:
+            # Clk/Rst
+            clk10  = platform.request("clk10")
+            platform.add_platform_command("set_property CLOCK_DEDICATED_ROUTE FALSE [get_nets clk10_IBUF]")
+
+            # MMCM.
+            self.mmcm = mmcm = S7MMCM()
+            mmcm.register_clkin(clk10, 10e6)
+            mmcm.create_clkout(self.cd_clk50, 50e6, margin=0)
+        else:
+            pll.create_clkout(self.cd_clk50, 50e6,         margin=0)
 
 # BaseSoC -----------------------------------------------------------------------------------------
 

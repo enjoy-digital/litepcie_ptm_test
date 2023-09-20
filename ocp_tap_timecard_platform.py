@@ -26,7 +26,8 @@ _io = [
         Subsignal("p", Pins("R4"), IOStandard("DIFF_SSTL15")),
         Subsignal("n", Pins("T4"), IOStandard("DIFF_SSTL15"))
     ),
-    ("rst_n", 0, Pins("T6"), IOStandard("LVCMOS15")),
+    ("clk10", 0, Pins("W21"), IOStandard("LVCMOS33"), Misc("PULLDOWN=True")),
+    ("rst_n", 0, Pins("T6"),  IOStandard("LVCMOS15")),
 
     # Leds.
     ("user_led", 0, Pins("B13"), IOStandard("LVCMOS33")),

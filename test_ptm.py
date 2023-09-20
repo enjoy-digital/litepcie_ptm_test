@@ -45,10 +45,15 @@ def test_ptm(enable=1, loops=16, delay=1e-1, vcd_filename="test_ptm.vcd"):
     vcd_vars["t4"]    = vcd_writer.register_var("module", "t4",    "wire", size=64)
     vcd_vars["t2-t1"] = vcd_writer.register_var("module", "t2-t1", "wire", size=64)
     vcd_vars["t4-t1"] = vcd_writer.register_var("module", "t4-t1", "wire", size=64)
-
+    vcd_vars["t2-diff"] = vcd_writer.register_var("module", "t2-diff", "wire", size=64)
     # Read Master Time received by PTM Requester.
-    t_start  = time.time()
+    t_start    = time.time()
+    t2_ns_last = 0
     while loop < loops:
+        # Loop Delay.
+        while time.time() < (t_start + loop*delay):
+            pass
+
         # Latch FPGA registers.
         valid          = bus.regs.ptm_requester_status.read() & PTM_STATUS_VALID
         master_time_ns = bus.regs.ptm_requester_master_time.read()
@@ -58,12 +63,14 @@ def test_ptm(enable=1, loops=16, delay=1e-1, vcd_filename="test_ptm.vcd"):
         t1_ns = s_ns_to_ns(bus.regs.ptm_requester_t1_time.read())
         t4_ns = s_ns_to_ns(bus.regs.ptm_requester_t4_time.read())
         t_current = time.time()
-        vcd_writer.change(vcd_vars["t1"],    (t_current - t_start)*1e9, t1_ns)
-        vcd_writer.change(vcd_vars["t2"],    (t_current - t_start)*1e9, t2_ns)
-        vcd_writer.change(vcd_vars["t3"],    (t_current - t_start)*1e9, t3_ns)
-        vcd_writer.change(vcd_vars["t4"],    (t_current - t_start)*1e9, t4_ns)
-        vcd_writer.change(vcd_vars["t2-t1"], (t_current - t_start)*1e9, abs(t2_ns - t1_ns))
-        vcd_writer.change(vcd_vars["t4-t1"], (t_current - t_start)*1e9, abs(t4_ns - t1_ns))
+        if loop > 1:
+            vcd_writer.change(vcd_vars["t1"],    (t_current - t_start)*1e9, t1_ns)
+            vcd_writer.change(vcd_vars["t2"],    (t_current - t_start)*1e9, t2_ns)
+            vcd_writer.change(vcd_vars["t3"],    (t_current - t_start)*1e9, t3_ns)
+            vcd_writer.change(vcd_vars["t4"],    (t_current - t_start)*1e9, t4_ns)
+            vcd_writer.change(vcd_vars["t2-t1"], (t_current - t_start)*1e9, abs(t2_ns - t1_ns))
+            vcd_writer.change(vcd_vars["t4-t1"], (t_current - t_start)*1e9, abs(t4_ns - t1_ns))
+            vcd_writer.change(vcd_vars["t2-diff"], (t_current - t_start)*1e9, abs(t2_ns - t2_ns_last))
         r =  f"valid : {valid} "
         r += f"t2    (s): {t2_ns/1e9:.9f} "
         r += f"t3    (s): {t3_ns/1e9:.9f} "
@@ -71,6 +78,7 @@ def test_ptm(enable=1, loops=16, delay=1e-1, vcd_filename="test_ptm.vcd"):
         r += f"t4    (s): {t4_ns/1e9:.9f} "
         r += f"t2-t1 (s): {(t2_ns - t1_ns)/1e9:.9f} "
         r += f"t4-t1 (s): {(t4_ns - t1_ns)/1e9:.9f} "
+        r += f"t2_ns-t2ns_last (s): {(t2_ns - t2_ns_last)/1e9:.9f} "
         print(r)
         # Increment Loop.
         loop += 1
@@ -78,8 +86,7 @@ def test_ptm(enable=1, loops=16, delay=1e-1, vcd_filename="test_ptm.vcd"):
         bus.regs.ptm_requester_control.write(enable * PTM_CONTROL_ENABLE | PTM_CONTROL_TRIGGER)
         while (bus.regs.ptm_requester_status.read() & PTM_STATUS_BUSY):
             pass
-        # Loop Delay.
-        time.sleep(delay)
+        t2_ns_last = t2_ns
 
     # Close Bus.
     bus.close()

@@ -173,6 +173,8 @@ class PTMRequester(LiteXModule):
         time_cdc = stream.ClockDomainCrossing([("time", 64)],
             cd_from = "time",
             cd_to   = "sys",
+            #depth   = 64,
+            #buffered = True,
         )
         self.submodules += time_cdc
         self.comb += [
@@ -180,7 +182,11 @@ class PTMRequester(LiteXModule):
             time_cdc.sink.time.eq(self.time),
             time_cdc.source.ready.eq(1),
         ]
-        time = time_cdc.source.time
+        time = Signal(64)
+        self.sync += If(time_cdc.source.valid,
+            time.eq(time_cdc.source.time)
+        )
+        #time = time_cdc.source.time
 
         # PTM Request Endpoint.
         self.req_ep = req_ep = pcie_endpoint.packetizer.ptm_sink

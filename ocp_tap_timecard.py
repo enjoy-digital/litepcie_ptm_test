@@ -204,6 +204,11 @@ class BaseSoC(SoCMini):
             self.ptm_requester.time.eq(self.time_generator.time)
         ]
 
+        # PPS --------------------------------------------------------------------------------------
+
+        self.pps_generator = ClockDomainsRenamer("clk50")(PPSGenerator(clk_freq=50e6, time=self.time_generator.time))
+        self.comb += platform.request("som_led").eq(self.pps_generator.pps)
+
         # Analyzers --------------------------------------------------------------------------------
 
         if with_msi_analyzer:

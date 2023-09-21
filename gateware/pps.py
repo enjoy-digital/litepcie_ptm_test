@@ -13,7 +13,7 @@ from litex.gen.genlib.misc import WaitTimer
 # PPS Generator ------------------------------------------------------------------------------------
 
 class PPSGenerator(LiteXModule):
-    def __init__(self, sys_clk_freq, time):
+    def __init__(self, clk_freq, time):
         self.pps = Signal() # PPS Output.
 
         # # #
@@ -37,6 +37,6 @@ class PPSGenerator(LiteXModule):
         )
 
         # PPS Generation.
-        self.timer = WaitTimer(sys_clk_freq*200e-3) # 20% High / 80% Low PPS.
+        self.timer = WaitTimer(clk_freq*200e-3) # 20% High / 80% Low PPS.
         self.comb += self.timer.wait.eq(~start)
         self.comb += self.pps.eq(~self.timer.done)

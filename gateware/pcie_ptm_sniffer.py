@@ -540,14 +540,9 @@ class PCIePTMSniffer(LiteXModule):
             data_width   = 64,
             endianness   = "big",
             address_mask = 0,
-            capabilities = ["REQUEST", "COMPLETION", "CONFIGURATION", "PTM"],
+            capabilities = ["PTM"],
         ))
         self.comb += self.tlp_filter_formater.source.connect(self.tlp_depacketizer.sink)
-        self.comb += [
-            self.tlp_depacketizer.req_source.ready.eq(1),
-            self.tlp_depacketizer.cmp_source.ready.eq(1),
-            self.tlp_depacketizer.conf_source.ready.eq(1),
-        ]
 
         # TLP CDC.
         self.cdc = cdc = stream.ClockDomainCrossing(

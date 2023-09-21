@@ -29,8 +29,7 @@ def test_time(enable=1, loops=16):
     print("Read Time from Time Controller...")
     loop = 0
     while loop < loops:
-        r =   f"time_s : {bus.regs.time_controller_time_s.read():10d} "
-        r +=  f"time_ns: {bus.regs.time_controller_time_ns.read():10d} "
+        r =   f"time (s): {bus.regs.time_controller_time.read()/1e9:0.9f} "
         print(r)
         loop += 1
         bus.regs.time_controller_control.write(enable * TIME_CONTROL_ENABLE | TIME_CONTROL_LATCH)
@@ -39,8 +38,7 @@ def test_time(enable=1, loops=16):
 
     # Override Time.
     print("Override Time to 100s...")
-    bus.regs.time_controller_override_time_ns.write(0)
-    bus.regs.time_controller_override_time_s.write(100)
+    bus.regs.time_controller_override_time.write(int(100*1e9))
     bus.regs.time_controller_control.write(enable * TIME_CONTROL_ENABLE | TIME_CONTROL_OVERRIDE)
     bus.regs.time_controller_control.write(enable * TIME_CONTROL_ENABLE | TIME_CONTROL_LATCH)
 
@@ -48,8 +46,7 @@ def test_time(enable=1, loops=16):
     print("Read Time from Time Controller...")
     loop = 0
     while loop < loops:
-        r =   f"time_s : {bus.regs.time_controller_time_s.read():10d} "
-        r +=  f"time_ns: {bus.regs.time_controller_time_ns.read():10d} "
+        r =  f"time (s): {bus.regs.time_controller_time.read()/1e9:0.9f} "
         print(r)
         loop += 1
         bus.regs.time_controller_control.write(enable * TIME_CONTROL_ENABLE | TIME_CONTROL_LATCH)

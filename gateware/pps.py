@@ -13,7 +13,7 @@ from litex.gen.genlib.misc import WaitTimer
 # PPS Generator ------------------------------------------------------------------------------------
 
 class PPSGenerator(LiteXModule):
-    def __init__(self, clk_freq, time):
+    def __init__(self, clk_freq, time, offset=int(500e6)):
         self.pps = Signal() # PPS Output.
 
         # # #
@@ -30,7 +30,7 @@ class PPSGenerator(LiteXModule):
             )
         )
         fsm.act("RUN",
-            If(time > (count * int(1e9)),
+            If(time > ((count * int(1e9) + offset)),
                 start.eq(1),
                 NextValue(count, count + 1)
             )

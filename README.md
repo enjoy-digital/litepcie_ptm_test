@@ -57,7 +57,7 @@ $ litescope_cli -r analyzer_state
 [> Run PHC2SYS / PPS Demo
 -------------------------
 
-TimeCard -> Host regulation.
+TimeCard -> Host regulation:
 ```sh
 cd kernel
 make clean all
@@ -67,11 +67,18 @@ sudo phc_ctl /dev/ptp2 set
 sudo phc2sys -c CLOCK_REALTIME -s /dev/ptp2 -O 0 -N1 -m
 ```
 
-Host -> Intel I225 regulation.
+Host -> Intel I225 regulation:
 ```sh
 sudo /bin/bash
 echo 1 > /sys/class/ptp/ptp0/pps_enable
 echo 2 0 > /sys/class/ptp/ptp0/pins/SDP0
 echo '0 0 0 1 0' > /sys/class/ptp/ptp0/period
 sudo phc2sys -s CLOCK_REALTIME -c /dev/ptp0 -O 0 -m
+```
+
+Insert a glitch in the regulation:
+```sh
+Ctrl-C on TimeCard phc2sys
+sudo date -s XX:YY (a few seconds in the future)
+sudo phc2sys -c CLOCK_REALTIME -s /dev/ptp2 -O 0 -N1 -m
 ```

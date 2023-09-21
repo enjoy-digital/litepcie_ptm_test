@@ -64,7 +64,7 @@ from gateware.pps import PPSGenerator
 # CRG ----------------------------------------------------------------------------------------------
 
 class CRG(LiteXModule):
-    def __init__(self, platform, sys_clk_freq, use_clk10=False, use_pcie_clk=True):
+    def __init__(self, platform, sys_clk_freq, use_clk10=False, use_pcie_clk=False):
         self.cd_sys   = ClockDomain()
         self.cd_clk50 = ClockDomain()
 

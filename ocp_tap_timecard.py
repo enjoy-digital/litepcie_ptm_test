@@ -185,8 +185,8 @@ class BaseSoC(SoCMini):
         )
 
         self.time_controller = TimeController(
-            clk_domain = "sys",
-            clk_freq   = 125e6,
+            clk_domain = "clk50",
+            clk_freq   = 50e6,
         )
 
         # PTM --------------------------------------------------------------------------------------
@@ -206,10 +206,7 @@ class BaseSoC(SoCMini):
         self.comb += [
             self.ptm_requester.time_clk.eq(ClockSignal("sys")),
             self.ptm_requester.time_rst.eq(ResetSignal("sys")),
-            #self.ptm_requester.time.eq(self.time_generator.time)
-            #self.ptm_requester.time[0 :32].eq(self.time_controller.time_ns),
-            #self.ptm_requester.time[32:64].eq(self.time_controller.time_s),
-            self.ptm_requester.time.eq(self.time_controller.time)
+            self.ptm_requester.time.eq(self.time_generator.time)
         ]
 
         # Analyzers --------------------------------------------------------------------------------

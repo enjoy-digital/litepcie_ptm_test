@@ -165,30 +165,25 @@ class PTMRequester(LiteXModule):
         # # #
 
         # Time Clock Domain Crossing.
-        if True:
-            self.cd_time = ClockDomain()
-            self.comb += [
-                self.cd_time.clk.eq(self.time_clk),
-                self.cd_time.rst.eq(self.time_rst),
-            ]
-            time_cdc = stream.ClockDomainCrossing([("time", 64)],
-                cd_from  = "time",
-                cd_to    = "sys",
-                depth    = 64,
-                buffered = True,
-            )
-            self.submodules += time_cdc
-            self.comb += [
-                time_cdc.sink.valid.eq(1),
-                time_cdc.sink.time.eq(self.time),
-                time_cdc.source.ready.eq(1),
-            ]
-            time = Signal(64)
-            self.sync += If(time_cdc.source.valid,
-                time.eq(time_cdc.source.time)
-            )
-        else:
-            time = self.time
+        self.cd_time = ClockDomain()
+        self.comb += [
+            self.cd_time.clk.eq(self.time_clk),
+            self.cd_time.rst.eq(self.time_rst),
+        ]
+        time_cdc = stream.ClockDomainCrossing([("time", 64)],
+            cd_from  = "time",
+            cd_to    = "sys",
+        )
+        self.submodules += time_cdc
+        self.comb += [
+            time_cdc.sink.valid.eq(1),
+            time_cdc.sink.time.eq(self.time),
+            time_cdc.source.ready.eq(1),
+        ]
+        time = Signal(64)
+        self.sync += If(time_cdc.source.valid,
+            time.eq(time_cdc.source.time)
+        )
 
         # PTM Request Endpoint.
         self.req_ep = req_ep = pcie_endpoint.packetizer.ptm_sink

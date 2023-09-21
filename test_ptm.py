@@ -39,14 +39,14 @@ def test_ptm(enable=1, loops=16, delay=1e-1, vcd_filename="test_ptm.vcd"):
     # VCD Writer.
     vcd_writer = vcd.VCDWriter(open(vcd_filename, "w"), timescale="1 ns", date="today")
     vcd_vars = {}
-    vcd_vars["t1"]    = vcd_writer.register_var("module", "t1",    "wire", size=64)
-    vcd_vars["t2"]    = vcd_writer.register_var("module", "t2",    "wire", size=64)
-    vcd_vars["t3"]    = vcd_writer.register_var("module", "t3",    "wire", size=64)
-    vcd_vars["t4"]    = vcd_writer.register_var("module", "t4",    "wire", size=64)
-    vcd_vars["t2-t1"] = vcd_writer.register_var("module", "t2-t1", "wire", size=64)
-    vcd_vars["t4-t1"] = vcd_writer.register_var("module", "t4-t1", "wire", size=64)
-    vcd_vars["t2-diff"] = vcd_writer.register_var("module", "t2-diff", "wire", size=64)
-    vcd_vars["t1-diff"] = vcd_writer.register_var("module", "t1-diff", "wire", size=64)
+    vcd_vars["t1"]    = vcd_writer.register_var("module", "t1",    "real", size=64)
+    vcd_vars["t2"]    = vcd_writer.register_var("module", "t2",    "real", size=64)
+    vcd_vars["t3"]    = vcd_writer.register_var("module", "t3",    "real", size=64)
+    vcd_vars["t4"]    = vcd_writer.register_var("module", "t4",    "real", size=64)
+    vcd_vars["t2-t1"] = vcd_writer.register_var("module", "t2-t1", "real", size=64)
+    vcd_vars["t4-t1"] = vcd_writer.register_var("module", "t4-t1", "real", size=64)
+    vcd_vars["t2-diff"] = vcd_writer.register_var("module", "t2-diff", "real", size=64)
+    vcd_vars["t1-diff"] = vcd_writer.register_var("module", "t1-diff", "real", size=64)
     # Read Master Time received by PTM Requester.
     t_start    = time.time()
     t2_ns_last = 0
@@ -62,18 +62,18 @@ def test_ptm(enable=1, loops=16, delay=1e-1, vcd_filename="test_ptm.vcd"):
         link_delay_ns  = bus.regs.ptm_requester_link_delay.read()
         t2_ns = master_time_ns
         t3_ns = master_time_ns + link_delay_ns
-        t1_ns = s_ns_to_ns(bus.regs.ptm_requester_t1_time.read())
-        t4_ns = s_ns_to_ns(bus.regs.ptm_requester_t4_time.read())
+        t1_ns = bus.regs.ptm_requester_t1_time.read()
+        t4_ns = bus.regs.ptm_requester_t4_time.read()
         t_current = time.time()
-        if loop > 1:
+        if loop > 10:
             vcd_writer.change(vcd_vars["t1"],    (t_current - t_start)*1e9, t1_ns)
             vcd_writer.change(vcd_vars["t2"],    (t_current - t_start)*1e9, t2_ns)
             vcd_writer.change(vcd_vars["t3"],    (t_current - t_start)*1e9, t3_ns)
             vcd_writer.change(vcd_vars["t4"],    (t_current - t_start)*1e9, t4_ns)
-            vcd_writer.change(vcd_vars["t2-t1"], (t_current - t_start)*1e9, abs(t2_ns - t1_ns))
-            vcd_writer.change(vcd_vars["t4-t1"], (t_current - t_start)*1e9, abs(t4_ns - t1_ns))
-            vcd_writer.change(vcd_vars["t2-diff"], (t_current - t_start)*1e9, abs(t2_ns - t2_ns_last))
-            vcd_writer.change(vcd_vars["t1-diff"], (t_current - t_start)*1e9, abs(t1_ns - t1_ns_last))
+            vcd_writer.change(vcd_vars["t2-t1"], (t_current - t_start)*1e9,  t2_ns - t1_ns)
+            vcd_writer.change(vcd_vars["t4-t1"], (t_current - t_start)*1e9,  t4_ns - t1_ns)
+            vcd_writer.change(vcd_vars["t2-diff"], (t_current - t_start)*1e9, t2_ns - t2_ns_last)
+            vcd_writer.change(vcd_vars["t1-diff"], (t_current - t_start)*1e9, t1_ns - t1_ns_last)
         r =  f"valid : {valid} "
         r += f"t2    (s): {t2_ns/1e9:.9f} "
         r += f"t3    (s): {t3_ns/1e9:.9f} "
@@ -132,7 +132,6 @@ def test_ptm_tX(enable=1, loops=16, delay=1e-1, tX="t2",vcd_filename="test_ptm.v
         if tX == "t2":
             tX_ns = bus.regs.ptm_requester_master_time.read()
         if tX == "t1":
-            #tX_ns = s_ns_to_ns(bus.regs.ptm_requester_t1_time.read())
             tX_ns = bus.regs.ptm_requester_t1_time.read()
         t_ns       = t_current*1e9
         t_ns_diff  = (t_ns  - t_ns_last)
@@ -169,9 +168,9 @@ def main():
     parser.add_argument("--vcd",    default="test_ptm.vcd",   help="VCD dump file")
     args = parser.parse_args()
 
-    #test_ptm(enable=args.enable, loops=args.loops, delay=args.delay, vcd_filename=args.vcd)
+    test_ptm(enable=args.enable, loops=args.loops, delay=args.delay, vcd_filename=args.vcd)
     #test_ptm_tX(enable=args.enable, loops=args.loops, delay=args.delay, tX="t2", vcd_filename=args.vcd)
-    test_ptm_tX(enable=args.enable, loops=args.loops, delay=args.delay, tX="t1", vcd_filename=args.vcd)
+    #test_ptm_tX(enable=args.enable, loops=args.loops, delay=args.delay, tX="t1", vcd_filename=args.vcd)
 
 if __name__ == "__main__":
     main()

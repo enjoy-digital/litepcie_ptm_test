@@ -46,9 +46,11 @@ def test_ptm(enable=1, loops=16, delay=1e-1, vcd_filename="test_ptm.vcd"):
     vcd_vars["t2-t1"] = vcd_writer.register_var("module", "t2-t1", "wire", size=64)
     vcd_vars["t4-t1"] = vcd_writer.register_var("module", "t4-t1", "wire", size=64)
     vcd_vars["t2-diff"] = vcd_writer.register_var("module", "t2-diff", "wire", size=64)
+    vcd_vars["t1-diff"] = vcd_writer.register_var("module", "t1-diff", "wire", size=64)
     # Read Master Time received by PTM Requester.
     t_start    = time.time()
     t2_ns_last = 0
+    t1_ns_last = 0
     while loop < loops:
         # Loop Delay.
         while time.time() < (t_start + loop*delay):
@@ -71,6 +73,7 @@ def test_ptm(enable=1, loops=16, delay=1e-1, vcd_filename="test_ptm.vcd"):
             vcd_writer.change(vcd_vars["t2-t1"], (t_current - t_start)*1e9, abs(t2_ns - t1_ns))
             vcd_writer.change(vcd_vars["t4-t1"], (t_current - t_start)*1e9, abs(t4_ns - t1_ns))
             vcd_writer.change(vcd_vars["t2-diff"], (t_current - t_start)*1e9, abs(t2_ns - t2_ns_last))
+            vcd_writer.change(vcd_vars["t1-diff"], (t_current - t_start)*1e9, abs(t1_ns - t1_ns_last))
         r =  f"valid : {valid} "
         r += f"t2    (s): {t2_ns/1e9:.9f} "
         r += f"t3    (s): {t3_ns/1e9:.9f} "
@@ -79,6 +82,7 @@ def test_ptm(enable=1, loops=16, delay=1e-1, vcd_filename="test_ptm.vcd"):
         r += f"t2-t1 (s): {(t2_ns - t1_ns)/1e9:.9f} "
         r += f"t4-t1 (s): {(t4_ns - t1_ns)/1e9:.9f} "
         r += f"t2_ns-t2ns_last (s): {(t2_ns - t2_ns_last)/1e9:.9f} "
+        r += f"t1_ns-t1ns_last (s): {(t1_ns - t1_ns_last)/1e9:.9f} "
         print(r)
         # Increment Loop.
         loop += 1
@@ -87,6 +91,7 @@ def test_ptm(enable=1, loops=16, delay=1e-1, vcd_filename="test_ptm.vcd"):
         while (bus.regs.ptm_requester_status.read() & PTM_STATUS_BUSY):
             pass
         t2_ns_last = t2_ns
+        t1_ns_last = t1_ns
 
     # Close Bus.
     bus.close()

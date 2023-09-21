@@ -981,9 +981,13 @@ int compare_revisions(struct revision d1, struct revision d2)
 /* from stackoverflow */
 
 /* time */
-#define TIME_CONTROL_ENABLE   (1 << CSR_TIME_CONTROLLER_CONTROL_ENABLE_OFFSET)
-#define TIME_CONTROL_LATCH    (1 << CSR_TIME_CONTROLLER_CONTROL_LATCH_OFFSET)
-#define TIME_CONTROL_OVERRIDE (1 << CSR_TIME_CONTROLLER_CONTROL_OVERRIDE_OFFSET)
+#define TIME_CONTROL_OVERRIDE_L (CSR_TIME_CONTROLLER_OVERRIDE_TIME_ADDR + (4))
+#define TIME_CONTROL_OVERRIDE_H (CSR_TIME_CONTROLLER_OVERRIDE_TIME_ADDR + (0))
+#define TIME_CONTROL_TIME_L     (CSR_TIME_CONTROLLER_TIME_ADDR + (4))
+#define TIME_CONTROL_TIME_H     (CSR_TIME_CONTROLLER_TIME_ADDR + (0))
+#define TIME_CONTROL_ENABLE     (1 << CSR_TIME_CONTROLLER_CONTROL_ENABLE_OFFSET)
+#define TIME_CONTROL_LATCH      (1 << CSR_TIME_CONTROLLER_CONTROL_LATCH_OFFSET)
+#define TIME_CONTROL_OVERRIDE   (1 << CSR_TIME_CONTROLLER_CONTROL_OVERRIDE_OFFSET)
 
 /* PTM */
 #define PTM_CONTROL_ENABLE  (1 << CSR_PTM_REQUESTER_CONTROL_ENABLE_OFFSET)
@@ -999,22 +1003,27 @@ int compare_revisions(struct revision d1, struct revision d2)
 
 static int litepcie_read_time(struct litepcie_device *dev, struct timespec64 *ts)
 {
-	u32 nsec = 0, sec = 0;
+	struct timespec64 rd_ts;
+	s64 value;
 	litepcie_writel(dev, CSR_TIME_CONTROLLER_CONTROL_ADDR,
 			(TIME_CONTROL_ENABLE | TIME_CONTROL_LATCH));
-	nsec = litepcie_readl(dev, CSR_TIME_CONTROLLER_TIME_NS_ADDR);
-	sec = litepcie_readl(dev, CSR_TIME_CONTROLLER_TIME_S_ADDR);
 
-	ts->tv_nsec = nsec;
-	ts->tv_sec = sec;
+	value = (((s64) litepcie_readl(dev, TIME_CONTROL_TIME_H) << 32) |
+		(litepcie_readl(dev, TIME_CONTROL_TIME_L) & 0xffffffff));
+
+	rd_ts = ns_to_timespec64(value);
+	ts->tv_nsec = rd_ts.tv_nsec;
+	ts->tv_sec = rd_ts.tv_sec;
 
 	return 0;
 }
 
 static int litepcie_write_time(struct litepcie_device *dev, const struct timespec64 *ts)
 {
-	litepcie_writel(dev, CSR_TIME_CONTROLLER_OVERRIDE_TIME_NS_ADDR, ts->tv_nsec);
-	litepcie_writel(dev, CSR_TIME_CONTROLLER_OVERRIDE_TIME_S_ADDR, ts->tv_sec);
+	s64 value = timespec64_to_ns(ts);
+
+	litepcie_writel(dev, TIME_CONTROL_OVERRIDE_L, (value >>  0) & 0xffffffff);
+	litepcie_writel(dev, TIME_CONTROL_OVERRIDE_H, (value >> 32) & 0xffffffff);
 	litepcie_writel(dev, CSR_TIME_CONTROLLER_CONTROL_ADDR,
 			(TIME_CONTROL_ENABLE | TIME_CONTROL_OVERRIDE));
 
@@ -1110,9 +1119,9 @@ static int litepcie_phc_get_syncdevicetime(ktime_t *device,
 	u32 t2_curr_h, t2_curr_l;
 	u32 reg;
 	struct litepcie_device *dev = ctx;
+	u64 t1_curr;
 	ktime_t t1, t2_curr;
 	int count = 100;
-	struct timespec64 ts;
 
 	/* Get a snapshot of system clocks to use as historic value. */
 	ktime_get_snapshot(&dev->snapshot);
@@ -1124,7 +1133,7 @@ static int litepcie_phc_get_syncdevicetime(ktime_t *device,
 	/* wait until valid */
 	do {
 		reg = litepcie_readl(dev, CSR_PTM_REQUESTER_STATUS_ADDR);
-		if ((reg & PTM_STATUS_VALID) != 0)
+		if ((reg & PTM_STATUS_BUSY) == 0)
 			break;
 	}while (--count);
 
@@ -1133,19 +1142,10 @@ static int litepcie_phc_get_syncdevicetime(ktime_t *device,
 		return -ETIMEDOUT;
 	}
 
-#if 1
 	t1_curr_l = litepcie_readl(dev, PTM_T1_TIME_L);
 	t1_curr_h = litepcie_readl(dev, PTM_T1_TIME_H);
-#if 1
-	t1 = ktime_set(t1_curr_h, t1_curr_l);
-#else
 	t1_curr = ((u64)t1_curr_h << 32 | t1_curr_l);
 	t1 = ns_to_ktime(t1_curr);
-#endif
-#else
-	litepcie_read_time(dev, &ts);
-	t1 = ktime_set(ts.tv_sec, ts.tv_nsec);
-#endif
 
 	t2_curr_l = litepcie_readl(dev, PTM_MASTER_TIME_L);
 	t2_curr_h = litepcie_readl(dev, PTM_MASTER_TIME_H);
@@ -1157,7 +1157,6 @@ static int litepcie_phc_get_syncdevicetime(ktime_t *device,
 #else
     *system (struct system_counterval_t) { };
 #endif
-
 
 	return 0;
 }

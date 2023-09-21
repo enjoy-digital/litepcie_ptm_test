@@ -57,7 +57,7 @@ from litepcie.software import generate_litepcie_software
 from litescope import LiteScopeAnalyzer
 
 from gateware.pcie_ptm_sniffer import PCIePTMSniffer
-from gateware.time import TimeGenerator, TimeController
+from gateware.time import TimeGenerator
 from gateware.ptm import PTMCapabilities, PTMRequester
 from gateware.pps import PPSGenerator
 
@@ -179,7 +179,7 @@ class BaseSoC(SoCMini):
         )
         # Time -------------------------------------------------------------------------------------
 
-        self.time_controller = TimeController(
+        self.time_generator = TimeGenerator(
             clk_domain = "clk50",
             clk_freq   = 50e6,
         )
@@ -201,7 +201,7 @@ class BaseSoC(SoCMini):
         self.comb += [
             self.ptm_requester.time_clk.eq(ClockSignal("sys")),
             self.ptm_requester.time_rst.eq(ResetSignal("sys")),
-            self.ptm_requester.time.eq(self.time_controller.time)
+            self.ptm_requester.time.eq(self.time_generator.time)
         ]
 
         # Analyzers --------------------------------------------------------------------------------

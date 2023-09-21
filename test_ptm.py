@@ -170,7 +170,7 @@ def main():
 
     #test_ptm(enable=args.enable, loops=args.loops, delay=args.delay, vcd_filename=args.vcd)
     #test_ptm_tX(enable=args.enable, loops=args.loops, delay=args.delay, tX="t2", vcd_filename=args.vcd)
-    test_ptm_tX(enable=args.enable, loops=args.loops, delay=args.delay, tX="t2", vcd_filename=args.vcd)
+    test_ptm_tX(enable=args.enable, loops=args.loops, delay=args.delay, tX="t1", vcd_filename=args.vcd)
 
 if __name__ == "__main__":
     main()

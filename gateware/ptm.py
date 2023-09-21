@@ -171,10 +171,10 @@ class PTMRequester(LiteXModule):
             self.cd_time.rst.eq(self.time_rst),
         ]
         time_cdc = stream.ClockDomainCrossing([("time", 64)],
-            cd_from = "time",
-            cd_to   = "sys",
-            #depth   = 64,
-            #buffered = True,
+            cd_from  = "time",
+            cd_to    = "sys",
+            depth    = 64,
+            buffered = True,
         )
         self.submodules += time_cdc
         self.comb += [

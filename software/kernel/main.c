@@ -981,13 +981,13 @@ int compare_revisions(struct revision d1, struct revision d2)
 /* from stackoverflow */
 
 /* time */
-#define TIME_CONTROL_OVERRIDE_L (CSR_TIME_CONTROLLER_OVERRIDE_TIME_ADDR + (4))
-#define TIME_CONTROL_OVERRIDE_H (CSR_TIME_CONTROLLER_OVERRIDE_TIME_ADDR + (0))
-#define TIME_CONTROL_TIME_L     (CSR_TIME_CONTROLLER_TIME_ADDR + (4))
-#define TIME_CONTROL_TIME_H     (CSR_TIME_CONTROLLER_TIME_ADDR + (0))
-#define TIME_CONTROL_ENABLE     (1 << CSR_TIME_CONTROLLER_CONTROL_ENABLE_OFFSET)
-#define TIME_CONTROL_LATCH      (1 << CSR_TIME_CONTROLLER_CONTROL_LATCH_OFFSET)
-#define TIME_CONTROL_OVERRIDE   (1 << CSR_TIME_CONTROLLER_CONTROL_OVERRIDE_OFFSET)
+#define TIME_CONTROL_WRITE_TIME_L (CSR_TIME_GENERATOR_WRITE_TIME_ADDR + (4))
+#define TIME_CONTROL_WRITE_TIME_H (CSR_TIME_GENERATOR_WRITE_TIME_ADDR + (0))
+#define TIME_CONTROL_READ_TIME_L  (CSR_TIME_GENERATOR_READ_TIME_ADDR + (4))
+#define TIME_CONTROL_READ_TIME_H  (CSR_TIME_GENERATOR_READ_TIME_ADDR + (0))
+#define TIME_CONTROL_ENABLE       (1 << CSR_TIME_GENERATOR_CONTROL_ENABLE_OFFSET)
+#define TIME_CONTROL_READ         (1 << CSR_TIME_GENERATOR_CONTROL_READ_OFFSET)
+#define TIME_CONTROL_WRITE        (1 << CSR_TIME_GENERATOR_CONTROL_WRITE_OFFSET)
 
 /* PTM */
 #define PTM_CONTROL_ENABLE  (1 << CSR_PTM_REQUESTER_CONTROL_ENABLE_OFFSET)
@@ -1005,11 +1005,11 @@ static int litepcie_read_time(struct litepcie_device *dev, struct timespec64 *ts
 {
 	struct timespec64 rd_ts;
 	s64 value;
-	litepcie_writel(dev, CSR_TIME_CONTROLLER_CONTROL_ADDR,
-			(TIME_CONTROL_ENABLE | TIME_CONTROL_LATCH));
+	litepcie_writel(dev, CSR_TIME_GENERATOR_CONTROL_ADDR,
+			(TIME_CONTROL_ENABLE | TIME_CONTROL_READ));
 
-	value = (((s64) litepcie_readl(dev, TIME_CONTROL_TIME_H) << 32) |
-		(litepcie_readl(dev, TIME_CONTROL_TIME_L) & 0xffffffff));
+	value = (((s64) litepcie_readl(dev, TIME_CONTROL_READ_TIME_H) << 32) |
+		(litepcie_readl(dev, TIME_CONTROL_READ_TIME_L) & 0xffffffff));
 
 	rd_ts = ns_to_timespec64(value);
 	ts->tv_nsec = rd_ts.tv_nsec;
@@ -1022,10 +1022,10 @@ static int litepcie_write_time(struct litepcie_device *dev, const struct timespe
 {
 	s64 value = timespec64_to_ns(ts);
 
-	litepcie_writel(dev, TIME_CONTROL_OVERRIDE_L, (value >>  0) & 0xffffffff);
-	litepcie_writel(dev, TIME_CONTROL_OVERRIDE_H, (value >> 32) & 0xffffffff);
-	litepcie_writel(dev, CSR_TIME_CONTROLLER_CONTROL_ADDR,
-			(TIME_CONTROL_ENABLE | TIME_CONTROL_OVERRIDE));
+	litepcie_writel(dev, TIME_CONTROL_WRITE_TIME_L, (value >>  0) & 0xffffffff);
+	litepcie_writel(dev, TIME_CONTROL_WRITE_TIME_H, (value >> 32) & 0xffffffff);
+	litepcie_writel(dev, CSR_TIME_GENERATOR_CONTROL_ADDR,
+			(TIME_CONTROL_ENABLE | TIME_CONTROL_WRITE));
 
 	return 0;
 }
@@ -1431,7 +1431,7 @@ static int litepcie_pci_probe(struct pci_dev *dev, const struct pci_device_id *i
 	}
 
 	/* enable timer (time) counter */
-	litepcie_writel(litepcie_dev, CSR_TIME_CONTROLLER_CONTROL_ADDR, TIME_CONTROL_ENABLE);
+	litepcie_writel(litepcie_dev, CSR_TIME_GENERATOR_CONTROL_ADDR, TIME_CONTROL_ENABLE);
 
 	litepcie_writel(litepcie_dev, CSR_PTM_REQUESTER_CONTROL_ADDR, PTM_CONTROL_ENABLE | PTM_CONTROL_TRIGGER);
 	litepcie_writel(litepcie_dev, CSR_PTM_REQUESTER_CONTROL_ADDR, PTM_CONTROL_ENABLE | PTM_CONTROL_TRIGGER);

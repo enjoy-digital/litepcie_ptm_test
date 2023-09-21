@@ -207,8 +207,9 @@ class BaseSoC(SoCMini):
             self.ptm_requester.time_clk.eq(ClockSignal("sys")),
             self.ptm_requester.time_rst.eq(ResetSignal("sys")),
             #self.ptm_requester.time.eq(self.time_generator.time)
-            self.ptm_requester.time[0 :32].eq(self.time_controller.time_ns),
-            self.ptm_requester.time[32:64].eq(self.time_controller.time_s),
+            #self.ptm_requester.time[0 :32].eq(self.time_controller.time_ns),
+            #self.ptm_requester.time[32:64].eq(self.time_controller.time_s),
+            self.ptm_requester.time.eq(self.time_controller.time)
         ]
 
         # Analyzers --------------------------------------------------------------------------------

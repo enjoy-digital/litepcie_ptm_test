@@ -132,7 +132,8 @@ def test_ptm_tX(enable=1, loops=16, delay=1e-1, tX="t2",vcd_filename="test_ptm.v
         if tX == "t2":
             tX_ns = bus.regs.ptm_requester_master_time.read()
         if tX == "t1":
-            tX_ns = s_ns_to_ns(bus.regs.ptm_requester_t1_time.read())
+            #tX_ns = s_ns_to_ns(bus.regs.ptm_requester_t1_time.read())
+            tX_ns = bus.regs.ptm_requester_t1_time.read()
         t_ns       = t_current*1e9
         t_ns_diff  = (t_ns  - t_ns_last)
         tX_ns_diff = (tX_ns - tX_ns_last)

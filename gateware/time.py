@@ -47,6 +47,7 @@ class TimeController(LiteXModule):
         # Time Signals.
         self.time_ns = time_ns = Signal(32)
         self.time_s  = time_s  = Signal(32)
+        self.time    = time    = Signal(64)
 
         # Time Clk Domain.
         self.cd_time = ClockDomain()
@@ -72,7 +73,8 @@ class TimeController(LiteXModule):
                     time_ns.eq(0),
                     time_s.eq(time_s + 1)
                 )
-            )
+            ),
+            self.time.eq(self.time + 1)
         ]
 
         # CSRs.

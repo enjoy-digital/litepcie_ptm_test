@@ -285,7 +285,7 @@ class PTMRequester(LiteXModule):
         self._master_time  = CSRStatus(64, description="Last PTM Master Time (in ns).")
         self._link_delay   = CSRStatus(32, description="Last PTM Link Delay (in ns).")
         self._t1_time      = CSRStatus(64, description="Last PTM T1 Time (in ns).")
-        self._t4_time      = CSRStatus(64, description="Last PTM T2 Time (in ns).")
+        self._t4_time      = CSRStatus(64, description="Last PTM T4 Time (in ns).")
 
         # # #
 

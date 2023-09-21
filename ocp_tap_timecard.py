@@ -1,45 +1,20 @@
 #!/usr/bin/env python3
 
 #
-# This file is part of LiteX-Boards.
+# This file is part of LitePCIe-PTM.
 #
-# Copyright (c) 2023 Florent Kermarrec <florent@enjoy-digital.fr>
+# Copyright (c) 2023 NetTimeLogic
+# Copyright (c) 2019-2023 Florent Kermarrec <florent@enjoy-digital.fr>
 # SPDX-License-Identifier: BSD-2-Clause
-
-# Build/Use ----------------------------------------------------------------------------------------
-# Build/Load bitstream:
-# ./ocp_tap_timecard.py --csr-csv=csr.csv --build --load
-# ./ocp_tap_timecard.py --csr-csv=csr.csv --build --no-compile --driver
-#
-#.Build the kernel and load it:
-# cd build/<platform>/driver/kernel
-# make
-# sudo ./init.sh
-#
-# Test userspace utilities:
-# cd build/<platform>/driver/user
-# make
-# ./litepcie_util info
-# ./litepcie_util scratch_test
-# ./litepcie_util dma_test
-# ./litepcie_util uart_test
-#
-# Debug over JTAGBone:
-# litex_server --jtag --jtag-config=openocd_xc7_ft232.cfg
-# litex_cli --regs
-# litescope_cli
 
 import os
 
 from migen import *
 
 from litex.gen import *
-from litex.gen.genlib.misc import WaitTimer
 
 import ocp_tap_timecard_platform as ocp_tap_timecard
 
-from litex.soc.interconnect.csr import *
-from litex.soc.interconnect import stream
 from litex.soc.integration.soc_core import *
 from litex.soc.integration.builder import *
 
@@ -47,9 +22,6 @@ from litex.soc.cores.clock import *
 from litex.soc.cores.led import LedChaser
 from litex.soc.cores.xadc import XADC
 from litex.soc.cores.dna  import DNA
-
-from litedram.modules import MT41K256M16
-from litedram.phy import s7ddrphy
 
 from gateware.pcie.s7pciephy import S7PCIEPHY
 from litepcie.software import generate_litepcie_software
@@ -75,25 +47,8 @@ class CRG(LiteXModule):
         self.pll = pll = S7PLL()
         pll.register_clkin(clk200, 200e6)
         pll.create_clkout(self.cd_sys,   sys_clk_freq, margin=0)
+        pll.create_clkout(self.cd_clk50, 50e6,         margin=0)
         platform.add_false_path_constraints(self.cd_sys.clk, pll.clkin) # Ignore sys_clk to pll.clkin path created by SoC's rst.
-
-
-        if use_clk10:
-            # Clk/Rst
-            clk10  = platform.request("clk10")
-            platform.add_platform_command("set_property CLOCK_DEDICATED_ROUTE FALSE [get_nets clk10_IBUF]")
-
-            # MMCM.
-            self.mmcm = mmcm = S7MMCM()
-            mmcm.register_clkin(clk10, 10e6)
-            mmcm.create_clkout(self.cd_clk50, 50e6, margin=0)
-        elif use_pcie_clk:
-            # MMCM.
-            self.mmcm = mmcm = S7MMCM()
-            mmcm.register_clkin(ClockSignal("pcie"), 125e6)
-            mmcm.create_clkout(self.cd_clk50, 50e6, margin=0)
-        else:
-            pll.create_clkout(self.cd_clk50, 50e6,         margin=0)
 
 # BaseSoC -----------------------------------------------------------------------------------------
 
@@ -109,7 +64,6 @@ class BaseSoC(SoCMini):
         with_ptm_conf_analyzer         = False,
         with_pcie_ptm_sniffer_analyzer = False,
         with_pcie_requester_analyzer   = False,
-        with_pps_analyzer              = False,
         **kwargs):
         platform = ocp_tap_timecard.Platform()
 
@@ -206,8 +160,10 @@ class BaseSoC(SoCMini):
 
         # PPS --------------------------------------------------------------------------------------
 
-        self.pps_generator = ClockDomainsRenamer("clk50")(PPSGenerator(clk_freq=50e6, time=self.time_generator.time))
-        self.comb += platform.request("som_led").eq(~self.pps_generator.pps)
+        pps_generator = PPSGenerator(clk_freq=50e6, time=self.time_generator.time)
+        pps_generator = ClockDomainsRenamer("clk50")(pps_generator)
+        self.submodules += pps_generator
+        self.comb += platform.request("som_led").eq(~pps_generator.pps)
 
         # Analyzers --------------------------------------------------------------------------------
 
@@ -223,6 +179,7 @@ class BaseSoC(SoCMini):
                 depth        = 512,
                 register     = True,
                 clock_domain = "sys",
+                samplerate   = sys_clk_freq,
                 csr_csv      = "analyzer.csv"
             )
 
@@ -235,20 +192,21 @@ class BaseSoC(SoCMini):
                 depth        = 512,
                 register     = True,
                 clock_domain = "sys",
+                samplerate   = sys_clk_freq,
                 csr_csv      = "analyzer.csv"
             )
 
         if with_pcie_ptm_sniffer_analyzer:
             # Analyzer
             analyzer_signals = [
-                self.ptm_requester.ptm_trigger,
+                self.ptm_requester.trigger,
                 self.pcie_ptm_sniffer.source,
             ]
             self.analyzer = LiteScopeAnalyzer(analyzer_signals,
                 depth        = 2048,
                 register     = True,
-                samplerate   = 100e6,
                 clock_domain = "sys",
+                samplerate   = sys_clk_freq,
                 csr_csv      = "analyzer.csv"
             )
 
@@ -265,23 +223,8 @@ class BaseSoC(SoCMini):
             self.analyzer = LiteScopeAnalyzer(analyzer_signals,
                 depth        = 256,
                 register     = True,
-                samplerate   = 100e6,
                 clock_domain = "sys",
-                csr_csv      = "analyzer.csv"
-            )
-
-        if with_pps_analyzer:
-            # Analyzer
-            analyzer_signals = [
-                self.ptm_requester.valid,
-                self.ptm_requester.update,
-                #self.ptm_time_generator.time,
-            ]
-            self.analyzer = LiteScopeAnalyzer(analyzer_signals,
-                depth        = 256,
-                register     = True,
-                samplerate   = 100e6,
-                clock_domain = "sys",
+                samplerate   = sys_clk_freq,
                 csr_csv      = "analyzer.csv"
             )
 

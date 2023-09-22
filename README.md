@@ -111,6 +111,20 @@ could simplify the integration and avoid maintaining modified version of these g
 
 A demo application allows time synchronization of an Intel I225 Network Card to the time of the TimeCard through PTM/Linux/phc2sys , with both boards generating a PPS and a logic analyzer capturing both PPS to check synchronization:
 
+Start **Host's CLOCK_REALTIME -> Intel I225's time** regulation:
+```sh
+$ sudo /bin/bash
+$ echo 1 > /sys/class/ptp/ptp0/pps_enable
+$ echo 2 0 > /sys/class/ptp/ptp0/pins/SDP0
+$ echo '0 0 0 1 0' > /sys/class/ptp/ptp0/period
+$ sudo phc2sys -s CLOCK_REALTIME -c /dev/ptp0 -O 0 -m
+```
+
+
+With this, both the TimeCard and Intel I225 boards are generating their PPS, as can be seen unaligned:
+![](doc/ptm_demo_pps_unaligned.png)
+
+
 Start **TimeCard's time -> Host's CLOCK_REALTIME** regulation:
 ```sh
 $ cd kernel
@@ -121,18 +135,10 @@ $ sudo phc_ctl /dev/ptp2 set
 $ sudo phc2sys -c CLOCK_REALTIME -s /dev/ptp2 -O 0 -N1 -m
 ```
 
-Start **Host's CLOCK_REALTIME -> Intel I225's time** regulation:
-```sh
-$ sudo /bin/bash
-$ echo 1 > /sys/class/ptp/ptp0/pps_enable
-$ echo 2 0 > /sys/class/ptp/ptp0/pins/SDP0
-$ echo '0 0 0 1 0' > /sys/class/ptp/ptp0/period
-$ sudo phc2sys -s CLOCK_REALTIME -c /dev/ptp0 -O 0 -m
-```
+With this, `CLOCK_REALTIME` is now disciplined on TimeCard, Intel I225 on `CLOCK_REALTIME` and
+PPS are now aligned:
 
-Correct regulation/alignement of the two PPS can be observed with a logic analyzer:
-
-![](doc/ptm_demo_pps_alignment.png)
+![](doc/ptm_demo_pps_aligned.png)
 
 PPS edges have also been observed with a scope to evaluate aligment offset/jitter:
 
@@ -146,6 +152,7 @@ delays in the regulation chain:
 - Time resynchronization delay between TimeGenerator and PTMRequester.
 - PPSGenerator delay between TimeGenerator and PPSGenerator.
 - PCIe PHY logic TX/RX delays.
+- Clocks drift/phase.
 
 Since TimeGenerator and PPSGenerator modules are minimalist and created just for this demo application, it will
 be more interesting to fine tune the offset/delays on the final application. The work done here and

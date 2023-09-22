@@ -15,22 +15,25 @@ The project provides PTM support/demo with LitePCIe on the TimeCard.
 
 ![](doc/timecard.png)
 
-The FPGA board is configured as a PTM Requester and a utilities/tests are provided to demonstrate correct operation.
+The FPGA board is configured as a PTM Requester and utilities/tests are provided to demonstrate correct operation.
 
-To ease integration/maintenance, the PTM packets definition and Packetizer/Depacketizer modules are directly integrated in [LitePCIe](https://github.com/enjoy-digital/litepcie). This project then provides:
-- A PCIePTMSniffer module sniffing GTPE2 <-> PCIE2 traffic and generating PTM Responses (Could be optional with other PCIe PHYs allowing PTM TLP messages).
-- A TimeGenerator module to generate local time and interfacing with the Linux driver.
-- A PPSGenerator module to generate a PPS and allow external synchronization comparison with another PTM compatible board.
-- A LiteX design example integrating LitePCIe with PTM support enabled and the demo application.
+To ease integration/maintenance, the PTM packet definitions and Packetizer/Depacketizer modules are directly integrated in [LitePCIe](https://github.com/enjoy-digital/litepcie).
+
+This project provides:
+- A PCIePTMSniffer module sniffing GTPE2 <-> PCIE2 traffic and generating PTM Responses. A PCIePTMInjector is not required since PTM Request are able to traverse the Xilinx PHY.
+- A TimeGenerator module to generate a local time (in ns) and interface with the Linux driver.
+- A PPSGenerator module to generate a PPS and allow external synchronization test with other PTM compatible boards.
+- A LiteX design integrating LitePCIe with PTM support on the TimeCard.
 - A Linux driver adding PTP/PTM support to LitePCIe driver.
+- A demo application with phc2sys
 
-
-As a demonstration of the work, a demo application has been prepared to synchronize the time of an Intel I225 Network Card to the time of the TimeCard through PTM/Linux/PHC2Sys utility with both boards generating a PPS and a logic analyzer capturing both PPS to check synchronization:
+As a demonstration of the work, an application has been prepared to synchronize the time of an Intel I225 Network Card to the time of the TimeCard through PTM/Linux/phc2sys utility with both boards generating a PPS and a logic analyzer/Scope observing the PPS:
 
 ![](doc/ptm_setup.png)
 
 [> Prerequisites / System setup
 -------------------------------
+
 These are required in order to build and use the FPGA design and associated software provided in this project:
 - Linux computer, PTM capable (Tested with Ubuntu 20.04).
 - Python3, Xilinx Vivado installed.
@@ -51,10 +54,12 @@ The re-generated PTM TLPs can then be re-injected in to LitePCIe core and use it
 
 ![](doc/ptm_sniffer.png)
 
+The Xilinx PHY however allow generating the PTM Requests from the AXI interface, so a PCIePTMInjector module hasn't been required.
+
 [> Run Unit-tests
 -----------------
 
-Implementing the PCIePTMSniffer module required doing some hardware capture with Litescope of the GTPE2 <-> PCIE2 hardblock traffic. These raw captures have been used to create descrambling/decoding logic and can be found in test directory.
+Implementing the PCIePTMSniffer module required doing some hardware capture with Litescope of the GTPE2 <-> PCIE2 hardblock traffic. These raw captures have been used to create the descrambling/decoding logic and can be found in test directory.
 
 These tests can be exectuted with:
 ```sh
@@ -92,13 +97,19 @@ The standalone core can be generated with `./litepcie_gen.py ocp_tap_timecard.ym
 - time_rst: The Rst used for time generation.
 - time_ns: The time in nanoseconds (Time that will be used for internal PTM T1/T4 time sampling
 
-Enabling PTM adds a PTMRequester module to the design, that has its own register. Its used is demonstrated
+Enabling PTM adds a PTMRequester module to the design, with its own registers. The use is demonstrated
 in the provided Linux driver ('software/kernel').
+
+Due to the `PCIePTMSniffer` workaround, some modifications had to be made to the generated PHY verilog files to expose the signals that need to be observed.
+The modified generated files can be found in `gateware/pcie/ip/pcie_s7` folder and have to be used when building the design.
+
+In the future, it could be interesting to see if these signals could simply be extracted through Vivado's tcl commands to add connections to our design. This
+could simplify the integration and avoid maintaining modified version of these generated files.
 
 [> Run PHC2SYS / PPS Demo
 -------------------------
 
-A demo application has been prepared, allowing time synchronization of an Intel I225 Network Card to the time of the TimeCard through PTM/Linux/phc2sys , with both boards generating a PPS and a logic analyzer capturing both PPS to check synchronization:
+A demo application allows time synchronization of an Intel I225 Network Card to the time of the TimeCard through PTM/Linux/phc2sys , with both boards generating a PPS and a logic analyzer capturing both PPS to check synchronization:
 
 Start **TimeCard's time -> Host's CLOCK_REALTIME** regulation:
 ```sh

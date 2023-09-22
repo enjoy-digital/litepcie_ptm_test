@@ -38,7 +38,10 @@ The re-generated PTM TLPs can then be re-injected in to LitePCIe core and use it
 
 [> Run Unit-tests
 -----------------
-TODO: Add more info/diagram.
+
+Implementing the PCIePTMSniffer module required doing some hardware capture with Litescope of the GTPE2 <-> PCIE2 hardblock traffic. These raw captures have been used to create descrambling/decoding logic and can be found in test directory.
+
+These tests can be exectuted with:
 ```sh
 $ python3 -m unittest test.test_raw_sniffer
 $ python3 -m unittest test.test_tlp_sniffer

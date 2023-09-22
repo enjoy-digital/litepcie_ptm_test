@@ -72,7 +72,7 @@ class BaseSoC(SoCMini):
         with_ptm_conf_analyzer         = False,
         with_pcie_ptm_sniffer_analyzer = False,
         with_pcie_requester_analyzer   = False,
-        with_pcie_delays_analyzer      = True,
+        with_pcie_delays_analyzer      = False,
         **kwargs):
         platform = ocp_tap_timecard.Platform()
 

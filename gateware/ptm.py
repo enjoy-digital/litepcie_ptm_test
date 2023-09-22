@@ -256,7 +256,7 @@ class PTMRequester(LiteXModule):
             )
         )
 
-    def add_csr(self, sys_clk_freq, default_enable=1, phy_tx_delay=0, phy_rx_delay=0):
+    def add_csr(self, sys_clk_freq, default_enable=1, phy_tx_delay=40e-9, phy_rx_delay=100e-9):
         self._control = CSRStorage(fields=[
             CSRField("enable", size=1, offset=0, values=[
                 ("``0b0``", "PTM Requester Disabled."),
@@ -275,8 +275,8 @@ class PTMRequester(LiteXModule):
             ]),
 
         ])
-        self._phy_tx_delay = CSRStatus(32, reset=phy_tx_delay, description="PHY TX logic delay (in ns).")
-        self._phy_rx_delay = CSRStatus(32, reset=phy_rx_delay, description="PHY RX logic delay (in ns).")
+        self._phy_tx_delay = CSRStatus(32, reset=int(phy_tx_delay*1e9), description="PHY TX logic delay (in ns).")
+        self._phy_rx_delay = CSRStatus(32, reset=int(phy_rx_delay*1e9), description="PHY RX logic delay (in ns).")
         self._master_time  = CSRStatus(64, description="Last PTM Master Time (in ns).")
         self._link_delay   = CSRStatus(32, description="Last PTM Link Delay (in ns).")
         self._t1_time      = CSRStatus(64, description="Last PTM T1 Time (in ns).")

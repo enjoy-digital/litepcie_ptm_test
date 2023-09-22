@@ -75,6 +75,26 @@ $ ./test_time.py
 $ ./test_ptm.py
 ```
 
+[> Generate standalone LitePCIe standalone core with PTM support.
+-----------------------------------------------------------------
+
+A specific version of `litepcie_gen` standalone core generator is provided with PTM support.
+
+LitePCIe's `.yml` configuration files can be reused and enabling PTM can be done by adding:
+```yml
+    # PTM ----------------------------------------------------------------------
+    "ptm"                     : True, # Enable PTM support.
+```
+
+The standalone core can be generated with `./litepcie_gen.py ocp_tap_timecard.yml` and when generated with PTM support, will expose 3 additional input IOs:
+
+- time_clk: The Clk used for time generation.
+- time_rst: The Rst used for time generation.
+- time_ns: The time in nanoseconds (Time that will be used for internal PTM T1/T4 time sampling
+
+Enabling PTM adds a PTMRequester module to the design, that has its own register. Its used is demonstrated
+in the provided Linux driver ('software/kernel').
+
 [> Run PHC2SYS / PPS Demo
 -------------------------
 

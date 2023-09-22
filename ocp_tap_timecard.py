@@ -13,7 +13,7 @@ from migen import *
 
 from litex.gen import *
 
-import ocp_tap_timecard_platform as ocp_tap_timecard
+from litex_boards.platforms import ocp_tap_timecard
 
 from litex.soc.integration.soc_core import *
 from litex.soc.integration.builder import *

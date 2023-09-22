@@ -240,11 +240,12 @@ class BaseSoC(SoCMini):
         if with_pcie_delays_analyzer:
             # Analyzer
             analyzer_signals = [
-                # Request.
+                # PTM Request Observation.
                 self.ptm_requester.req_ep.valid,
                 self.ptm_requester.req_ep.ready,
-                self.pcie_phy.sink,
-                # Response.
+                self.pcie_phy.sniffer_tx_data,
+                self.pcie_phy.sniffer_tx_ctl,
+                # PTM Response Observation.
                 self.ptm_requester.res_ep.valid,
                 self.ptm_requester.res_ep.ready,
                 self.pcie_phy.sniffer_rx_data,

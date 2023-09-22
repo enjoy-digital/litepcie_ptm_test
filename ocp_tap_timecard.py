@@ -64,6 +64,7 @@ class BaseSoC(SoCMini):
         with_ptm_conf_analyzer         = False,
         with_pcie_ptm_sniffer_analyzer = False,
         with_pcie_requester_analyzer   = False,
+        with_pcie_delays_analyzer      = True,
         **kwargs):
         platform = ocp_tap_timecard.Platform()
 
@@ -222,6 +223,27 @@ class BaseSoC(SoCMini):
             ]
             self.analyzer = LiteScopeAnalyzer(analyzer_signals,
                 depth        = 256,
+                register     = True,
+                clock_domain = "sys",
+                samplerate   = sys_clk_freq,
+                csr_csv      = "analyzer.csv"
+            )
+
+        if with_pcie_delays_analyzer:
+            # Analyzer
+            analyzer_signals = [
+                # Request.
+                self.ptm_requester.req_ep.valid,
+                self.ptm_requester.req_ep.ready,
+                self.pcie_phy.sink,
+                # Response.
+                self.ptm_requester.res_ep.valid,
+                self.ptm_requester.res_ep.ready,
+                self.pcie_phy.sniffer_rx_data,
+                self.pcie_phy.sniffer_rx_ctl,
+            ]
+            self.analyzer = LiteScopeAnalyzer(analyzer_signals,
+                depth        = 8192,
                 register     = True,
                 clock_domain = "sys",
                 samplerate   = sys_clk_freq,

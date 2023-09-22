@@ -103,6 +103,8 @@ struct litepcie_device {
 	struct ptp_clock *litepcie_ptp_clock;
 	struct system_time_snapshot snapshot;
 	struct ptp_clock_info ptp_caps;
+	u64 t1_prev;
+	u64 t4_prev;
 };
 
 struct litepcie_chan_priv {
@@ -1000,6 +1002,15 @@ int compare_revisions(struct revision d1, struct revision d2)
 /* t2 */
 #define PTM_MASTER_TIME_L   (CSR_PTM_REQUESTER_MASTER_TIME_ADDR + (4))
 #define PTM_MASTER_TIME_H   (CSR_PTM_REQUESTER_MASTER_TIME_ADDR + (0))
+/* t4 */
+#define PTM_T4_TIME_L       (CSR_PTM_REQUESTER_T4_TIME_ADDR + (4))
+#define PTM_T4_TIME_H       (CSR_PTM_REQUESTER_T4_TIME_ADDR + (0))
+
+static u64 litepcie_read64(struct litepcie_device *dev, uint32_t addr)
+{
+	return (((u64) litepcie_readl(dev, addr) << 32) |
+		(litepcie_readl(dev, addr + 4) & 0xffffffff));
+}
 
 static int litepcie_read_time(struct litepcie_device *dev, struct timespec64 *ts)
 {
@@ -1117,7 +1128,9 @@ static int litepcie_phc_get_syncdevicetime(ktime_t *device,
 {
 	u32 t1_curr_h, t1_curr_l;
 	u32 t2_curr_h, t2_curr_l;
+	u32 prop_delay;
 	u32 reg;
+	u64 ptm_master_time;
 	struct litepcie_device *dev = ctx;
 	u64 t1_curr;
 	ktime_t t1, t2_curr;
@@ -1151,12 +1164,21 @@ static int litepcie_phc_get_syncdevicetime(ktime_t *device,
 	t2_curr_h = litepcie_readl(dev, PTM_MASTER_TIME_H);
 	t2_curr = ((u64)t2_curr_h << 32 | t2_curr_l);
 
+	/* t3-t2 from downstream port */
+	prop_delay = litepcie_readl(dev, CSR_PTM_REQUESTER_LINK_DELAY_ADDR);
+	/* PTM Master Time formula */
+	ptm_master_time = t2_curr - (((dev->t4_prev - dev->t1_prev) - prop_delay) >> 1);
+
 	*device = t1;
 #if IS_ENABLED(CONFIG_X86_TSC) && !defined(CONFIG_UML)
-	*system = convert_art_ns_to_tsc(t2_curr);
+	*system = convert_art_ns_to_tsc(ptm_master_time);
 #else
     *system (struct system_counterval_t) { };
 #endif
+
+	/* store T4 & T1 for next request */
+	dev->t4_prev = litepcie_read64(dev, CSR_PTM_REQUESTER_T4_TIME_ADDR);
+	dev->t1_prev = t1_curr;
 
 	return 0;
 }
@@ -1206,6 +1228,7 @@ static int litepcie_pci_probe(struct pci_dev *dev, const struct pci_device_id *i
 #ifdef CSR_UART_XOVER_RXTX_ADDR
 	struct resource *tty_res = NULL;
 #endif
+	int count = 100;
 
 	dev_info(&dev->dev, "\e[1m[Probing device]\e[0m\n");
 
@@ -1433,8 +1456,25 @@ static int litepcie_pci_probe(struct pci_dev *dev, const struct pci_device_id *i
 	/* enable timer (time) counter */
 	litepcie_writel(litepcie_dev, CSR_TIME_GENERATOR_CONTROL_ADDR, TIME_CONTROL_ENABLE);
 
+	/* enable PTM control and start first request */
 	litepcie_writel(litepcie_dev, CSR_PTM_REQUESTER_CONTROL_ADDR, PTM_CONTROL_ENABLE | PTM_CONTROL_TRIGGER);
+	/* prepare T1 & T4 for next request */
+	do {
+		if ((litepcie_readl(litepcie_dev, CSR_PTM_REQUESTER_STATUS_ADDR) & PTM_STATUS_BUSY) == 0)
+			break;
+	} while (--count);
+
 	litepcie_writel(litepcie_dev, CSR_PTM_REQUESTER_CONTROL_ADDR, PTM_CONTROL_ENABLE | PTM_CONTROL_TRIGGER);
+	count = 100;
+	do {
+		if ((litepcie_readl(litepcie_dev, CSR_PTM_REQUESTER_STATUS_ADDR) & PTM_STATUS_BUSY) == 0)
+			break;
+	} while (--count);
+
+	litepcie_dev->t4_prev = litepcie_read64(litepcie_dev, CSR_PTM_REQUESTER_T4_TIME_ADDR);
+
+	litepcie_dev->t1_prev = (((u64)litepcie_readl(litepcie_dev, PTM_T1_TIME_L) << 32) |
+		litepcie_readl(litepcie_dev, PTM_T1_TIME_H));
 
 	spin_lock_init(&litepcie_dev->tmreg_lock);
 

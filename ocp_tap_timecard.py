@@ -53,9 +53,17 @@ class CRG(LiteXModule):
 # BaseSoC -----------------------------------------------------------------------------------------
 
 class BaseSoC(SoCMini):
+    SoCMini.mem_map["csr"] = 0x00000000
     SoCMini.csr_map = {
-        "pcie_msi":       3, # Requires fixed mapping for MSI-X.
-        "pcie_msi_table": 4, # Requires fixed mapping for MSI-X.
+        "ctrl"             : 0,
+        "crg"              : 1,
+        "pcie_phy"         : 2,
+        "pcie_msi"         : 3,
+        "pcie_msi_table"   : 4,
+        "ptm_capabilities" : 5,
+        "ptm_requester"    : 6,
+        "time_generator"   : 7,
+        "pps_generator"    : 8,
     }
     def __init__(self, sys_clk_freq=125e6, pcie_address_width=32, pcie_msi_type="msi-x", with_ptm=True,
         with_jtagbone                  = True,

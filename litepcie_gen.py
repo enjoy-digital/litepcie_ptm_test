@@ -168,11 +168,13 @@ class LitePCIeCRG(LiteXModule):
 class LitePCIeCore(SoCMini):
     SoCMini.mem_map["csr"] = 0x00000000
     SoCMini.csr_map = {
-        "ctrl":           0,
-        "crg" :           1,
-        "pcie_phy":       2,
-        "pcie_msi":       3,
-        "pcie_msi_table": 4,
+        "ctrl"             : 0,
+        "crg"              : 1,
+        "pcie_phy"         : 2,
+        "pcie_msi"         : 3,
+        "pcie_msi_table"   : 4,
+        "ptm_capabilities" : 5,
+        "ptm_requester"    : 6,
     }
     def __init__(self, platform, core_config):
         platform.add_extension(get_pcie_ios(core_config["phy_lanes"]))

@@ -204,17 +204,12 @@ class S7PCIEPHY(LiteXModule):
         m_axis_rx_tlast = Signal()
         m_axis_rx_tuser = Signal(32)
 
-        self.cfg_msg_received = Signal()
-
         self.sniffer_rst_n   = Signal()
         self.sniffer_clk     = Signal()
-        self.sniffer_tx_data = Signal(16)
-        self.sniffer_tx_ctl  = Signal(2)
         self.sniffer_rx_data = Signal(16)
         self.sniffer_rx_ctl  = Signal(2)
 
         self.pcie_phy_params = dict(
-            #p_c_enable_msg_route = "11111111111",
             # PCI Express Interface ----------------------------------------------------------------
             # Clk/Rst
             i_sys_clk     = pcie_refclk,
@@ -379,7 +374,7 @@ class S7PCIEPHY(LiteXModule):
             # VC Interface -------------------------------------------------------------------------
             o_cfg_vc_tcvc_map                    = Open(),
 
-            o_cfg_msg_received                   = self.cfg_msg_received,
+            o_cfg_msg_received                   = Open(),
             o_cfg_msg_data                       = Open(),
             o_cfg_msg_received_pm_as_nak         = Open(),
             o_cfg_msg_received_setslotpowerlimit = Open(),
@@ -431,8 +426,6 @@ class S7PCIEPHY(LiteXModule):
 
             o_sniffer_rst_n   = self.sniffer_rst_n,
             o_sniffer_clk     = self.sniffer_clk,
-            o_sniffer_tx_data = self.sniffer_tx_data,
-            o_sniffer_tx_ctl  = self.sniffer_tx_ctl,
             o_sniffer_rx_data = self.sniffer_rx_data,
             o_sniffer_rx_ctl  = self.sniffer_rx_ctl,
         )
@@ -509,7 +502,6 @@ class S7PCIEPHY(LiteXModule):
                     config.update({
                         "EXT_PCI_CFG_Space"      : True,
                         "EXT_PCI_CFG_Space_Addr" : "6B", # 0x1AC.
-                        "En_route_unlock"        : True,
                     })
 
                 # Tcl generation.

@@ -132,14 +132,39 @@ class BaseSoC(SoCMini):
             platform.toolchain.pre_placement_commands.append(f"set_false_path -from [get_clocks {clk1}] -to [get_clocks {clk0}]")
 
         # PCIe PTM Sniffer -------------------------------------------------------------------------
-        # Since Xilinx PHY does not allow redirecting PTM TLP Messages to the AXI inferface, we sniff
-        # the GTPE2 -> PCIE2 RX Data to re-generate PTM TLP Messages.
 
+        # Since Xilinx PHY does not allow redirecting PTM TLP Messages to the AXI inferface, we have
+        # to sniff the GTPE2 -> PCIE2 RX Data to re-generate PTM TLP Messages.
+
+        # Sniffer Signals.
+        # ----------------
+        sniffer_rst_n   = Signal()
+        sniffer_clk     = Signal()
+        sniffer_rx_data = Signal(16)
+        sniffer_rx_ctl  = Signal(2)
+
+        # Sniffer Tap.
+        # ------------
+        self.specials += Instance("pcie_ptm_sniffer_tap",
+            i_rst_n_in   = self.pcie_phy.sniffer_rst_n,
+            i_clk_in     = self.pcie_phy.sniffer_clk,
+            i_rx_data_in = self.pcie_phy.sniffer_rx_data,
+            i_rx_ctl_in  = self.pcie_phy.sniffer_rx_ctl,
+
+            o_rst_n_out   = sniffer_rst_n,
+            o_clk_out     = sniffer_clk,
+            o_rx_data_out = sniffer_rx_data,
+            o_rx_ctl_out  = sniffer_rx_ctl,
+        )
+        platform.add_source("gateware/pcie_ptm_sniffer_tap.v")
+
+        # Sniffer.
+        # --------
         self.pcie_ptm_sniffer = PCIePTMSniffer(
-            rx_rst_n = self.pcie_phy.sniffer_rst_n,
-            rx_clk   = self.pcie_phy.sniffer_clk,
-            rx_data  = self.pcie_phy.sniffer_rx_data,
-            rx_ctrl  = self.pcie_phy.sniffer_rx_ctl,
+            rx_rst_n = sniffer_rst_n,
+            rx_clk   = sniffer_clk,
+            rx_data  = sniffer_rx_data,
+            rx_ctrl  = sniffer_rx_ctl,
         )
         # Time -------------------------------------------------------------------------------------
 

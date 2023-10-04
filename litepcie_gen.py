@@ -56,7 +56,6 @@ from litepcie.software import generate_litepcie_software_headers
 
 from litex.build.generic_platform import *
 
-from gateware.pcie.s7pciephy import S7PCIEPHY
 from gateware.pcie_ptm_sniffer import PCIePTMSniffer
 from gateware.ptm import PTMCapabilities, PTMRequester
 
@@ -349,28 +348,94 @@ class LitePCIeCore(SoCMini):
         # PCIe PTM ---------------------------------------------------------------------------------
         if core_config.get("ptm", False):
 
-            # PCIe PTM Sniffer -------------------------------------------------------------------------
-            # Since Xilinx PHY does not allow redirecting PTM TLP Messages to the AXI inferface, we sniff
-            # the GTPE2 -> PCIE2 RX Data to re-generate PTM TLP Messages.
+            # PCIe PTM Sniffer ---------------------------------------------------------------------
 
+            # Since Xilinx PHY does not allow redirecting PTM TLP Messages to the AXI inferface, we have
+            # to sniff the GTPE2 -> PCIE2 RX Data to re-generate PTM TLP Messages.
+
+            # Sniffer Signals.
+            # ----------------
+            sniffer_rst_n   = Signal()
+            sniffer_clk     = Signal()
+            sniffer_rx_data = Signal(16)
+            sniffer_rx_ctl  = Signal(2)
+
+            # Sniffer Tap.
+            # ------------
+            rx_data = Signal(16)
+            rx_ctl  = Signal(2)
+            self.sync.pclk += rx_data.eq(rx_data + 1)
+            self.sync.pclk += rx_ctl.eq(rx_ctl + 1)
+            self.specials += Instance("pcie_ptm_sniffer_tap",
+                i_rst_n_in    = 1,
+                i_clk_in     = ClockSignal("pclk"),
+                i_rx_data_in = rx_data, # /!\ Fake, will be re-connected post-synthesis /!\.
+                i_rx_ctl_in  = rx_ctl,  # /!\ Fake, will be re-connected post-synthesis /!\.
+
+                o_rst_n_out   = sniffer_rst_n,
+                o_clk_out     = sniffer_clk,
+                o_rx_data_out = sniffer_rx_data,
+                o_rx_ctl_out  = sniffer_rx_ctl,
+            )
+            platform.add_source("gateware/pcie_ptm_sniffer_tap.v")
+
+            # Sniffer.
+            # --------
             self.pcie_ptm_sniffer = PCIePTMSniffer(
-                rx_rst_n = self.pcie_phy.sniffer_rst_n,
-                rx_clk   = self.pcie_phy.sniffer_clk,
-                rx_data  = self.pcie_phy.sniffer_rx_data,
-                rx_ctrl  = self.pcie_phy.sniffer_rx_ctl,
+                rx_rst_n = sniffer_rst_n,
+                rx_clk   = sniffer_clk,
+                rx_data  = sniffer_rx_data,
+                rx_ctrl  = sniffer_rx_ctl,
             )
 
-            # PTM IOs.
+            # Sniffer Post-Synthesis connections.
+            # -----------------------------------
+            pcie_ptm_sniffer_connections = [
+                # Clk / Rst.
+                # From.      # To.
+                #("", "pcie_ptm_sniffer_tap/clk_in"),
+                #("", "pcie_ptm_sniffer_tap/rst_in"),
+
+                # RX Ctl.
+                # From.                                                     # To.
+                ("pcie_s7/inst/inst/gt_top_i/gt_rx_data_k_wire_filter[0]", "pcie_ptm_sniffer_tap/rx_ctl_in[0]"),
+                ("pcie_s7/inst/inst/gt_top_i/gt_rx_data_k_wire_filter[1]", "pcie_ptm_sniffer_tap/rx_ctl_in[1]"),
+
+                # RX Data.
+                # From.                                          # To.
+                ("pcie_s7/inst/inst/gt_top_i/gt_rx_data_wire_filter[ 0]", "pcie_ptm_sniffer_tap/rx_data_in[ 0]"),
+                ("pcie_s7/inst/inst/gt_top_i/gt_rx_data_wire_filter[ 1]", "pcie_ptm_sniffer_tap/rx_data_in[ 1]"),
+                ("pcie_s7/inst/inst/gt_top_i/gt_rx_data_wire_filter[ 2]", "pcie_ptm_sniffer_tap/rx_data_in[ 2]"),
+                ("pcie_s7/inst/inst/gt_top_i/gt_rx_data_wire_filter[ 3]", "pcie_ptm_sniffer_tap/rx_data_in[ 3]"),
+                ("pcie_s7/inst/inst/gt_top_i/gt_rx_data_wire_filter[ 4]", "pcie_ptm_sniffer_tap/rx_data_in[ 4]"),
+                ("pcie_s7/inst/inst/gt_top_i/gt_rx_data_wire_filter[ 5]", "pcie_ptm_sniffer_tap/rx_data_in[ 5]"),
+                ("pcie_s7/inst/inst/gt_top_i/gt_rx_data_wire_filter[ 6]", "pcie_ptm_sniffer_tap/rx_data_in[ 6]"),
+                ("pcie_s7/inst/inst/gt_top_i/gt_rx_data_wire_filter[ 7]", "pcie_ptm_sniffer_tap/rx_data_in[ 7]"),
+                ("pcie_s7/inst/inst/gt_top_i/gt_rx_data_wire_filter[ 8]", "pcie_ptm_sniffer_tap/rx_data_in[ 8]"),
+                ("pcie_s7/inst/inst/gt_top_i/gt_rx_data_wire_filter[ 9]", "pcie_ptm_sniffer_tap/rx_data_in[ 9]"),
+                ("pcie_s7/inst/inst/gt_top_i/gt_rx_data_wire_filter[10]", "pcie_ptm_sniffer_tap/rx_data_in[10]"),
+                ("pcie_s7/inst/inst/gt_top_i/gt_rx_data_wire_filter[11]", "pcie_ptm_sniffer_tap/rx_data_in[11]"),
+                ("pcie_s7/inst/inst/gt_top_i/gt_rx_data_wire_filter[12]", "pcie_ptm_sniffer_tap/rx_data_in[12]"),
+                ("pcie_s7/inst/inst/gt_top_i/gt_rx_data_wire_filter[13]", "pcie_ptm_sniffer_tap/rx_data_in[13]"),
+                ("pcie_s7/inst/inst/gt_top_i/gt_rx_data_wire_filter[14]", "pcie_ptm_sniffer_tap/rx_data_in[14]"),
+                ("pcie_s7/inst/inst/gt_top_i/gt_rx_data_wire_filter[15]", "pcie_ptm_sniffer_tap/rx_data_in[15]"),
+            ]
+            for _from, _to in pcie_ptm_sniffer_connections:
+                platform.toolchain.pre_optimize_commands.append(f"set pin_driver [get_nets -of [get_pins {_to}]]")
+                platform.toolchain.pre_optimize_commands.append(f"disconnect_net -net $pin_driver -objects {_to}")
+                platform.toolchain.pre_optimize_commands.append(f"connect_net -hier -net {_from} -objects {_to}")
+
+            # PTM IOs ------------------------------------------------------------------------------
             platform.add_extension(get_ptm_ios())
             ptm_ios = platform.request("ptm")
 
-            # PTM Capabilities.
+            # PTM Capabilities ---------------------------------------------------------------------
             self.ptm_capabilities = PTMCapabilities(
                 pcie_endpoint     = self.pcie_endpoint,
                 requester_capable = True,
             )
 
-            # PTM Requester.
+            # PTM Requester ------------------------------------------------------------------------
             self.ptm_requester = PTMRequester(
                 pcie_endpoint    = self.pcie_endpoint,
                 pcie_ptm_sniffer = self.pcie_ptm_sniffer,

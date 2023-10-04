@@ -24,6 +24,7 @@ from litex.soc.cores.xadc import XADC
 from litex.soc.cores.dna  import DNA
 
 from gateware.pcie.s7pciephy import S7PCIEPHY
+#from litepcie.phy.s7pciephy import S7PCIEPHY
 from litepcie.software import generate_litepcie_software
 
 from litescope import LiteScopeAnalyzer
@@ -145,17 +146,35 @@ class BaseSoC(SoCMini):
 
         # Sniffer Tap.
         # ------------
-        self.specials += Instance("pcie_ptm_sniffer_tap",
-            i_rst_n_in   = 1,
-            i_clk_in     = self.pcie_phy.sniffer_clk,
-            i_rx_data_in = self.pcie_phy.sniffer_rx_data,
-            i_rx_ctl_in  = self.pcie_phy.sniffer_rx_ctl,
+        rx_data = Signal(16)
+        rx_ctl  = Signal(2)
+        self.sync.pclk += rx_data.eq(rx_data + 1)
+        self.sync.pclk += rx_ctl.eq(rx_ctl + 1)
 
-            o_rst_n_out   = sniffer_rst_n,
-            o_clk_out     = sniffer_clk,
-            o_rx_data_out = sniffer_rx_data,
-            o_rx_ctl_out  = sniffer_rx_ctl,
-        )
+        if 0:
+            self.specials += Instance("pcie_ptm_sniffer_tap",
+                i_rst_n_in    = 1,
+                i_clk_in     = ClockSignal("pclk"),
+                i_rx_data_in = rx_data,              # /!\ Fake /!\.
+                i_rx_ctl_in  = rx_ctl,               # /!\ Fake /!\.
+
+                o_rst_n_out   = sniffer_rst_n,
+                o_clk_out     = sniffer_clk,
+                o_rx_data_out = sniffer_rx_data,
+                o_rx_ctl_out  = sniffer_rx_ctl,
+            )
+        else:
+            self.specials += Instance("pcie_ptm_sniffer_tap",
+                i_rst_n_in   = 1,
+                i_clk_in     = ClockSignal("pclk"),
+                i_rx_data_in = self.pcie_phy.sniffer_rx_data,
+                i_rx_ctl_in  = self.pcie_phy.sniffer_rx_ctl,
+
+                o_rst_n_out   = sniffer_rst_n,
+                o_clk_out     = sniffer_clk,
+                o_rx_data_out = sniffer_rx_data,
+                o_rx_ctl_out  = sniffer_rx_ctl,
+            )
         platform.add_source("gateware/pcie_ptm_sniffer_tap.v")
 
         # Sniffer.
@@ -172,31 +191,32 @@ class BaseSoC(SoCMini):
         pcie_ptm_sniffer_connections = [
             # Clk / Rst.
             # From.      # To.
-            ("pclk_clk", "pcie_ptm_sniffer_tap/clk_in"),
+            #("", "pcie_ptm_sniffer_tap/clk_in"),
+            #("", "pcie_ptm_sniffer_tap/rst_in"),
 
             # RX Ctl.
-            # From.                                                 # To.
-            ("pcie_s7/inst/inst/gt_top_i/gt_rxcharisk_q_reg[1][0]", "pcie_ptm_sniffer_tap/rx_ctl_in[0]"),
-            ("pcie_s7/inst/inst/gt_top_i/gt_rxcharisk_q_reg[1][1]", "pcie_ptm_sniffer_tap/rx_ctl_in[1]"),
+            # From.                                                     # To.
+            #("pcie_s7/inst/inst/gt_top_i/gt_rx_data_k_wire_filter[0]", "pcie_ptm_sniffer_tap/rx_ctl_in[0]"),
+            #("pcie_s7/inst/inst/gt_top_i/gt_rx_data_k_wire_filter[1]", "pcie_ptm_sniffer_tap/rx_ctl_in[1]"),
 
             # RX Data.
             # From.                                          # To.
-            ("pcie_s7/inst/inst/gt_top_i/pipe_rx0_data[ 0]", "pcie_ptm_sniffer_tap/rx_data_in[ 0]"),
-            ("pcie_s7/inst/inst/gt_top_i/pipe_rx0_data[ 1]", "pcie_ptm_sniffer_tap/rx_data_in[ 1]"),
-            ("pcie_s7/inst/inst/gt_top_i/pipe_rx0_data[ 2]", "pcie_ptm_sniffer_tap/rx_data_in[ 2]"),
-            ("pcie_s7/inst/inst/gt_top_i/pipe_rx0_data[ 3]", "pcie_ptm_sniffer_tap/rx_data_in[ 3]"),
-            ("pcie_s7/inst/inst/gt_top_i/pipe_rx0_data[ 4]", "pcie_ptm_sniffer_tap/rx_data_in[ 4]"),
-            ("pcie_s7/inst/inst/gt_top_i/pipe_rx0_data[ 5]", "pcie_ptm_sniffer_tap/rx_data_in[ 5]"),
-            ("pcie_s7/inst/inst/gt_top_i/pipe_rx0_data[ 6]", "pcie_ptm_sniffer_tap/rx_data_in[ 6]"),
-            ("pcie_s7/inst/inst/gt_top_i/pipe_rx0_data[ 7]", "pcie_ptm_sniffer_tap/rx_data_in[ 7]"),
-            ("pcie_s7/inst/inst/gt_top_i/pipe_rx0_data[ 8]", "pcie_ptm_sniffer_tap/rx_data_in[ 8]"),
-            ("pcie_s7/inst/inst/gt_top_i/pipe_rx0_data[ 9]", "pcie_ptm_sniffer_tap/rx_data_in[ 9]"),
-            ("pcie_s7/inst/inst/gt_top_i/pipe_rx0_data[10]", "pcie_ptm_sniffer_tap/rx_data_in[10]"),
-            ("pcie_s7/inst/inst/gt_top_i/pipe_rx0_data[11]", "pcie_ptm_sniffer_tap/rx_data_in[11]"),
-            ("pcie_s7/inst/inst/gt_top_i/pipe_rx0_data[12]", "pcie_ptm_sniffer_tap/rx_data_in[12]"),
-            ("pcie_s7/inst/inst/gt_top_i/pipe_rx0_data[13]", "pcie_ptm_sniffer_tap/rx_data_in[13]"),
-            ("pcie_s7/inst/inst/gt_top_i/pipe_rx0_data[14]", "pcie_ptm_sniffer_tap/rx_data_in[14]"),
-            ("pcie_s7/inst/inst/gt_top_i/pipe_rx0_data[15]", "pcie_ptm_sniffer_tap/rx_data_in[15]"),
+            #("pcie_s7/inst/inst/gt_top_i/pipe_rx0_data[ 0]", "pcie_ptm_sniffer_tap/rx_data_in[ 0]"),
+            #("pcie_s7/inst/inst/gt_top_i/pipe_rx0_data[ 1]", "pcie_ptm_sniffer_tap/rx_data_in[ 1]"),
+            #("pcie_s7/inst/inst/gt_top_i/pipe_rx0_data[ 2]", "pcie_ptm_sniffer_tap/rx_data_in[ 2]"),
+            #("pcie_s7/inst/inst/gt_top_i/pipe_rx0_data[ 3]", "pcie_ptm_sniffer_tap/rx_data_in[ 3]"),
+            #("pcie_s7/inst/inst/gt_top_i/pipe_rx0_data[ 4]", "pcie_ptm_sniffer_tap/rx_data_in[ 4]"),
+            #("pcie_s7/inst/inst/gt_top_i/pipe_rx0_data[ 5]", "pcie_ptm_sniffer_tap/rx_data_in[ 5]"),
+            #("pcie_s7/inst/inst/gt_top_i/pipe_rx0_data[ 6]", "pcie_ptm_sniffer_tap/rx_data_in[ 6]"),
+            #("pcie_s7/inst/inst/gt_top_i/pipe_rx0_data[ 7]", "pcie_ptm_sniffer_tap/rx_data_in[ 7]"),
+            #("pcie_s7/inst/inst/gt_top_i/pipe_rx0_data[ 8]", "pcie_ptm_sniffer_tap/rx_data_in[ 8]"),
+            #("pcie_s7/inst/inst/gt_top_i/pipe_rx0_data[ 9]", "pcie_ptm_sniffer_tap/rx_data_in[ 9]"),
+            #("pcie_s7/inst/inst/gt_top_i/pipe_rx0_data[10]", "pcie_ptm_sniffer_tap/rx_data_in[10]"),
+            #("pcie_s7/inst/inst/gt_top_i/pipe_rx0_data[11]", "pcie_ptm_sniffer_tap/rx_data_in[11]"),
+            #("pcie_s7/inst/inst/gt_top_i/pipe_rx0_data[12]", "pcie_ptm_sniffer_tap/rx_data_in[12]"),
+            #("pcie_s7/inst/inst/gt_top_i/pipe_rx0_data[13]", "pcie_ptm_sniffer_tap/rx_data_in[13]"),
+            #("pcie_s7/inst/inst/gt_top_i/pipe_rx0_data[14]", "pcie_ptm_sniffer_tap/rx_data_in[14]"),
+            #("pcie_s7/inst/inst/gt_top_i/pipe_rx0_data[15]", "pcie_ptm_sniffer_tap/rx_data_in[15]"),
         ]
         for _from, _to in pcie_ptm_sniffer_connections:
             platform.toolchain.pre_optimize_commands.append(f"set pin_driver [get_nets -of [get_pins {_to}]]")

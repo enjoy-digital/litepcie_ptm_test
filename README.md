@@ -83,15 +83,13 @@ $ ./test_ptm.py
 [> Generate standalone LitePCIe standalone core with PTM support.
 -----------------------------------------------------------------
 
-A specific version of `litepcie_gen` standalone core generator is provided with PTM support.
-
 LitePCIe's `.yml` configuration files can be reused and enabling PTM can be done by adding:
 ```yml
     # PTM ----------------------------------------------------------------------
     "ptm"                     : True, # Enable PTM support.
 ```
 
-The standalone core can be generated with `./litepcie_gen.py ocp_tap_timecard.yml` and when generated with PTM support, will expose 3 additional input IOs:
+The standalone core can be generated with `litepcie_gen.py ocp_tap_timecard.yml` and when generated with PTM support, will expose 3 additional input IOs:
 
 - time_clk: The Clk used for time generation.
 - time_rst: The Rst used for time generation.
@@ -99,12 +97,6 @@ The standalone core can be generated with `./litepcie_gen.py ocp_tap_timecard.ym
 
 Enabling PTM adds a PTMRequester module to the design, with its own registers. The use is demonstrated
 in the provided Linux driver ('software/kernel').
-
-Due to the `PCIePTMSniffer` workaround, some modifications had to be made to the generated PHY verilog files to expose the signals that need to be observed.
-The modified generated files can be found in `gateware/pcie/ip/pcie_s7` folder and have to be used when building the design.
-
-In the future, it could be interesting to see if these signals could simply be extracted through Vivado's tcl commands to add connections to our design. This
-could simplify the integration and avoid maintaining modified version of these generated files.
 
 [> Run PHC2SYS / PPS Demo
 -------------------------

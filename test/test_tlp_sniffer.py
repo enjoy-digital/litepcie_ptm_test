@@ -9,7 +9,7 @@ from litex.soc.interconnect import stream
 
 from test.dumps.dump_ptm_response001 import *
 
-from gateware.pcie_ptm_sniffer import TLPAligner, TLPEndiannessSwap, TLPFilterFormater
+from litepcie.frontend.ptm.sniffer import TLPAligner, TLPEndiannessSwap, TLPFilterFormater
 
 from litepcie.tlp.depacketizer import LitePCIeTLPDepacketizer
 

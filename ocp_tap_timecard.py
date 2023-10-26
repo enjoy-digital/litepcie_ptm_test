@@ -24,13 +24,13 @@ from litex.soc.cores.xadc import XADC
 from litex.soc.cores.dna  import DNA
 
 from litepcie.phy.s7pciephy import S7PCIEPHY
+from litepcie.frontend.ptm import PCIePTMSniffer
+from litepcie.frontend.ptm import PTMCapabilities, PTMRequester
 from litepcie.software import generate_litepcie_software
 
 from litescope import LiteScopeAnalyzer
 
-from gateware.pcie_ptm_sniffer import PCIePTMSniffer
 from gateware.time import TimeGenerator
-from gateware.ptm import PTMCapabilities, PTMRequester
 from gateware.pps import PPSGenerator
 
 # CRG ----------------------------------------------------------------------------------------------
@@ -147,7 +147,7 @@ class BaseSoC(SoCMini):
         rx_ctl  = Signal(2)
         self.sync.pclk += rx_data.eq(rx_data + 1)
         self.sync.pclk += rx_ctl.eq(rx_ctl + 1)
-        self.specials += Instance("pcie_ptm_sniffer_tap",
+        self.specials += Instance("sniffer_tap",
             i_rst_n_in    = 1,
             i_clk_in     = ClockSignal("pclk"),
             i_rx_data_in = rx_data, # /!\ Fake, will be re-connected post-synthesis /!\.
@@ -158,7 +158,6 @@ class BaseSoC(SoCMini):
             o_rx_data_out = sniffer_rx_data,
             o_rx_ctl_out  = sniffer_rx_ctl,
         )
-        platform.add_source("gateware/pcie_ptm_sniffer_tap.v")
 
         # Sniffer.
         # --------
@@ -168,6 +167,7 @@ class BaseSoC(SoCMini):
             rx_data  = sniffer_rx_data,
             rx_ctrl  = sniffer_rx_ctl,
         )
+        self.pcie_ptm_sniffer.add_sources(platform)
 
         # Sniffer Post-Synthesis connections.
         # -----------------------------------

@@ -9,7 +9,7 @@ from litex.soc.interconnect import stream
 
 from test.dumps.dump003 import *
 
-from gateware.pcie_ptm_sniffer import RawDatapath, RawDescrambler
+from litepcie.frontend.ptm.sniffer import RawDatapath, RawDescrambler
 
 def rx_data_generator(dut, length=8192-1024):
     rx_data = dump["s7pciephy_debug_rx_data"][:length:2]

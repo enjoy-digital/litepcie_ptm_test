@@ -120,10 +120,10 @@ class BaseSoC(SoCMini):
 
         # PCIe <-> Sys-Clk false paths.
         false_paths = [
-            ("s7pciephy_clkout0", "sys_clk"),
-            ("s7pciephy_clkout1", "sys_clk"),
-            ("s7pciephy_clkout3", "sys_clk"),
-            ("s7pciephy_clkout0", "s7pciephy_clkout1")
+            ("{{*s7pciephy_clkout0}}", "sys_clk"),
+            ("{{*s7pciephy_clkout1}}", "sys_clk"),
+            ("{{*s7pciephy_clkout3}}", "sys_clk"),
+            ("{{*s7pciephy_clkout0}}", "{{*s7pciephy_clkout1}}")
         ]
         for clk0, clk1 in false_paths:
             platform.toolchain.pre_placement_commands.append(f"set_false_path -from [get_clocks {clk0}] -to [get_clocks {clk1}]")
